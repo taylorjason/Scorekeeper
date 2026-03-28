@@ -31,7 +31,8 @@ export async function getPlayers(): Promise<Player[]> {
 }
 
 export async function getActivePlayers(): Promise<Player[]> {
-  return db.players.where('active').equals(1).toArray();
+  const all = await db.players.toArray();
+  return all.filter(p => p.active);
 }
 
 export async function createPlayer(data: Omit<Player, 'id'>): Promise<number> {

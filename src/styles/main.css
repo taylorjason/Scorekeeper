@@ -483,6 +483,110 @@ button, input, select, textarea {
 }
 
 /* ─── Score Cards ────────────────────────────────────────────────────────────── */
+/* ─── Card / Table toggle ────────────────────────────────────────────────── */
+.view-toggle-bar {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  width: fit-content;
+}
+.view-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.view-toggle-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ─── Score Table ────────────────────────────────────────────────────────── */
+.score-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 280px;
+}
+.score-table th {
+  padding: 0.55rem 0.6rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--surface);
+}
+.score-table-corner {
+  text-align: left !important;
+  color: var(--text-muted);
+  font-size: 0.7rem !important;
+}
+.score-table-round-row {
+  background: var(--surface);
+}
+.score-table-total-row {
+  background: var(--bg);
+}
+.score-table-totals-row {
+  background: var(--surface);
+  border-top: 2px solid var(--border);
+  font-weight: 700;
+}
+.score-table-label {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  border-right: 1px solid var(--border);
+}
+.score-table-label-total {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-style: italic;
+  border-right: 1px solid var(--border);
+}
+.score-table-score {
+  padding: 0.45rem 0.5rem;
+  text-align: center;
+  font-weight: 600;
+  border-bottom: 1px dashed var(--border);
+}
+.score-table-total {
+  padding: 0.3rem 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.score-table-footer {
+  padding: 0.5rem 0.5rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ─── Score grid ────────────────────────────────────────────────────────── */
 .score-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

@@ -22,6 +22,16 @@ export class ActiveMatch {
   private playerScores: PlayerScore[] = [];
   private currentRound: number = 1;
   private nightMatches: Match[] = [];
+  private tableView: boolean = false;
+
+  /** Return the display name for a 1-based round number. */
+  private roundLabel(roundNumber: number): string {
+    const labels = this.game?.roundLabels;
+    if (labels && labels.length >= roundNumber) {
+      return labels[roundNumber - 1];
+    }
+    return `Round ${roundNumber}`;
+  }
 
   async load(matchId: number): Promise<void> {
     this.matchId = matchId;
@@ -85,6 +95,89 @@ export class ActiveMatch {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  private renderScoreTable(): string {
+    if (this.players.length === 0 || this.entries.length === 0) {
+      return `<div class="text-sm text-muted" style="padding:1rem 0; text-align:center">No scores yet — add a round to see the table.</div>`;
+    }
+
+    // Collect all round numbers in order
+    const roundNums = [...new Set(this.entries.map(e => e.roundNumber))].sort((a, b) => a - b);
+
+    // Build running totals: runningTotals[playerId][after round index] = cumulative sum
+    const runningTotals = new Map<number, number>(); // playerId -> running total
+    for (const p of this.players) runningTotals.set(p.id!, 0);
+
+    // Header
+    const headerCells = this.players.map(p =>
+      `<th style="background:${p.color}22; border-bottom: 2px solid ${p.color}">
+        <div class="flex items-center gap-1 justify-center">
+          <span class="player-dot" style="background:${p.color}; flex-shrink:0"></span>
+          <span>${this.escHtml(p.displayName)}</span>
+        </div>
+      </th>`
+    ).join('');
+
+    // Rows — one score row + one running-total row per round
+    let rows = '';
+    for (const rn of roundNums) {
+      const roundEntries = this.entries.filter(e => e.roundNumber === rn);
+
+      // Score row
+      const scoreCells = this.players.map(p => {
+        const entry = roundEntries.find(e => e.playerId === p.id);
+        const val = entry?.value ?? '–';
+        return `<td class="score-table-score">${val}</td>`;
+      }).join('');
+
+      rows += `<tr class="score-table-round-row">
+        <td class="score-table-label">${this.escHtml(this.roundLabel(rn))}</td>
+        ${scoreCells}
+      </tr>`;
+
+      // Running-total row
+      const totalCells = this.players.map(p => {
+        const entry = roundEntries.find(e => e.playerId === p.id);
+        const prev = runningTotals.get(p.id!) ?? 0;
+        const next = prev + (entry?.value ?? 0);
+        runningTotals.set(p.id!, next);
+        return `<td class="score-table-total">= ${next}</td>`;
+      }).join('');
+
+      rows += `<tr class="score-table-total-row">
+        <td class="score-table-label-total">∑</td>
+        ${totalCells}
+      </tr>`;
+    }
+
+    // Final totals footer
+    const footerCells = this.players.map(p => {
+      const ps = this.playerScores.find(s => s.player.id === p.id);
+      return `<td class="score-table-footer">${ps?.total ?? 0}</td>`;
+    }).join('');
+
+    return `
+      <div class="score-table-wrapper" role="region" aria-label="Score table">
+        <table class="score-table" aria-label="Scores by round">
+          <thead>
+            <tr>
+              <th class="score-table-corner">Round</th>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+          <tfoot>
+            <tr class="score-table-totals-row">
+              <td class="score-table-label-total">Total</td>
+              ${footerCells}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+  }
+
   render(): string {
     if (!this.match || !this.game || !this.night) {
       return `
@@ -145,8 +238,8 @@ export class ActiveMatch {
         inputSectionHtml = `
           <div class="card mt-4">
             <div class="card-header">
-              <div class="card-title">Round ${this.currentRound}</div>
-              <span class="round-badge">🎯 Round ${this.currentRound}</span>
+              <div class="card-title">${this.roundLabel(this.currentRound)}</div>
+              <span class="round-badge">🎯 ${this.roundLabel(this.currentRound)}</span>
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:0.75rem; justify-content:center; margin-bottom:1rem;">
               ${inputs}
@@ -219,7 +312,7 @@ export class ActiveMatch {
           <div class="card mt-4">
             <div class="card-header">
               <div class="card-title">${addLabel}</div>
-              <span class="round-badge">Round ${this.currentRound}</span>
+              <span class="round-badge">${this.roundLabel(this.currentRound)}</span>
             </div>
             <div style="margin-bottom:1rem">
               ${runningInputs}
@@ -293,10 +386,19 @@ export class ActiveMatch {
 
         ${progressHtml}
 
+        <div class="view-toggle-bar">
+          <button class="view-toggle-btn ${!this.tableView ? 'active' : ''}" id="toggle-cards" aria-pressed="${!this.tableView}" aria-label="Card view">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            Cards
+          </button>
+          <button class="view-toggle-btn ${this.tableView ? 'active' : ''}" id="toggle-table" aria-pressed="${this.tableView}" aria-label="Table view">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+            Table
+          </button>
+        </div>
+
         <section aria-label="Current scores">
-          <div class="score-grid" id="score-grid">
-            ${scoreCardsHtml}
-          </div>
+          ${this.tableView ? this.renderScoreTable() : `<div class="score-grid" id="score-grid">${scoreCardsHtml}</div>`}
         </section>
 
         ${inputSectionHtml}
@@ -305,6 +407,15 @@ export class ActiveMatch {
   }
 
   afterRender(): void {
+    document.getElementById('toggle-cards')?.addEventListener('click', () => {
+      this.tableView = false;
+      this.reRender();
+    });
+    document.getElementById('toggle-table')?.addEventListener('click', () => {
+      this.tableView = true;
+      this.reRender();
+    });
+
     document.getElementById('back-to-dashboard')?.addEventListener('click', () => navigate('dashboard'));
     document.getElementById('back-btn')?.addEventListener('click', () => navigate('dashboard'));
     document.getElementById('back-to-night-btn')?.addEventListener('click', () => navigate('dashboard'));
@@ -392,7 +503,7 @@ export class ActiveMatch {
         });
       }
 
-      showToast(`Round ${this.currentRound} saved`, 'success');
+      showToast(`${this.roundLabel(this.currentRound)} saved`, 'success');
 
       // Reload and re-render
       await this.load(this.matchId);
@@ -411,7 +522,7 @@ export class ActiveMatch {
     try {
       const done = await deleteLastScoreEntry(this.matchId);
       if (done) {
-        showToast(`Removed round ${prevRound}`, 'info');
+        showToast(`Removed ${this.roundLabel(prevRound)}`, 'info');
         await this.load(this.matchId);
         this.reRender();
       }

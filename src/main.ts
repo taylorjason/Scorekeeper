@@ -11,6 +11,7 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
 
   container.innerHTML = '<div class="loading-view"><div class="spinner"></div></div>';
 
+  try {
   switch (parsed.route) {
     case 'dashboard': {
       const { Dashboard } = await import('./views/Dashboard');
@@ -60,6 +61,15 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
       view.afterRender();
       break;
     }
+  }
+  } catch (err) {
+    console.error('View load error:', err);
+    container.innerHTML = `
+      <div style="padding:2rem;text-align:center;color:var(--danger)">
+        <p style="font-size:1.5rem;margin-bottom:0.5rem">⚠️</p>
+        <strong>Failed to load view</strong>
+        <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.875rem">${err instanceof Error ? err.message : String(err)}</p>
+      </div>`;
   }
 
   updateNav(parsed.route);
@@ -151,12 +161,13 @@ async function init(): Promise<void> {
   const savedTheme = localStorage.getItem('scorekeeper_theme') ?? 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
 
-  await seedDemoData();
-
+  // Render the shell immediately so the user never stares at a spinner
   renderAppShell();
-
   initRouter();
   onRouteChange(loadView);
+
+  // Seed demo data in the background — non-fatal if it fails or is slow
+  seedDemoData().catch(err => console.warn('[Demo] Seed failed (non-fatal):', err));
 
   await loadView(getCurrentRoute());
 }

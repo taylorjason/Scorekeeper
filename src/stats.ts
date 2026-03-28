@@ -123,7 +123,8 @@ export interface LeaderboardEntry {
 }
 
 export async function computeLeaderboard(): Promise<LeaderboardEntry[]> {
-  const players = await db.players.where('active').equals(1).toArray();
+  const allPlayers = await db.players.toArray();
+  const players = allPlayers.filter(p => p.active);
   const completedMatches = await db.matches.where('status').equals('completed').toArray();
 
   const entries: LeaderboardEntry[] = await Promise.all(

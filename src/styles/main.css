@@ -1236,6 +1236,30 @@ button, input, select, textarea {
   background: var(--surface-hover);
 }
 
+/* ─── Version Footer ────────────────────────────────────────────────────────── */
+.version-footer {
+  position: fixed;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  padding: 2px 8px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-align: center;
+  opacity: 0.6;
+  letter-spacing: 0.02em;
+  z-index: 90;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.version-time {
+  opacity: 0.7;
+}
+
 /* ─── Bottom Nav (class-based) ──────────────────────────────────────────────── */
 .bottom-nav {
   position: fixed;

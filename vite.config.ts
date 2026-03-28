@@ -5,11 +5,15 @@ import { readFileSync, writeFileSync } from 'fs';
 // Read + auto-increment build number on every build
 const buildFile = new URL('./build-number.json', import.meta.url).pathname;
 const buildData = JSON.parse(readFileSync(buildFile, 'utf-8')) as { build: number };
-buildData.build += 1;
-writeFileSync(buildFile, JSON.stringify(buildData) + '\n');
-
+// In CI use GitHub's ever-incrementing run number; locally use the file
+const BUILD_NUMBER = process.env['BUILD_NUMBER']
+  ? Number(process.env['BUILD_NUMBER'])
+  : (() => {
+      buildData.build += 1;
+      writeFileSync(buildFile, JSON.stringify(buildData) + '\n');
+      return buildData.build;
+    })();
 const APP_VERSION = '1.0.0';
-const BUILD_NUMBER = buildData.build;
 const BUILD_TIME = new Date().toISOString();
 
 export default defineConfig({

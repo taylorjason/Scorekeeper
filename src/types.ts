@@ -17,6 +17,7 @@ export interface Game {
   scoringMode: ScoringMode;
   rules?: string; // optional notes about rules
   targetScore?: number; // for finish-order or target-based modes
+  roundLabels?: string[]; // optional per-round names, e.g. ["Phase 1", "Phase 2", ...]
   createdAt: number;
 }
 

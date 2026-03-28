@@ -257,7 +257,7 @@ export class Settings {
         <span style="font-size:1.25rem">🎯</span>
         <div class="flex-1">
           <div class="font-semibold text-sm">${this.escHtml(g.name)}</div>
-          <div class="text-xs text-muted">${g.scoringMode} scoring${g.rules ? ' · ' + this.escHtml(g.rules.substring(0, 40)) : ''}</div>
+          <div class="text-xs text-muted">${g.scoringMode} scoring${g.roundLabels?.length ? ` · ${g.roundLabels.length} round labels` : ''}${g.rules ? ' · ' + this.escHtml(g.rules.substring(0, 40)) : ''}</div>
         </div>
         <div class="actions">
           <button class="btn btn-icon btn-sm edit-game-btn" data-game-id="${g.id}" aria-label="Edit ${this.escHtml(g.name)}">
@@ -276,13 +276,14 @@ export class Settings {
     const mode = game?.scoringMode ?? 'high';
     const rules = game?.rules ?? '';
     const target = game?.targetScore ?? '';
+    const labels = (game?.roundLabels ?? []).join('\n');
 
     return `
       <form id="game-form" novalidate>
         <input type="hidden" id="game-editing-id" value="${game?.id ?? ''}" />
         <div class="form-group">
           <label class="form-label" for="game-name">Game Name <span aria-hidden="true">*</span></label>
-          <input class="form-input" type="text" id="game-name" placeholder="e.g. Catan"
+          <input class="form-input" type="text" id="game-name" placeholder="e.g. Five Crowns"
             value="${this.escHtml(name)}" required maxlength="50" autocomplete="off" />
           <span class="form-error" id="game-name-error" role="alert" aria-live="polite"></span>
         </div>
@@ -295,6 +296,13 @@ export class Settings {
             <option value="finish-order" ${mode === 'finish-order' ? 'selected' : ''}>Finish order (1st, 2nd...)</option>
             <option value="custom" ${mode === 'custom' ? 'selected' : ''}>Custom</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="game-round-labels">Round Labels (optional)</label>
+          <textarea class="form-textarea" id="game-round-labels"
+            placeholder="One label per line, e.g.&#10;Phase 1&#10;Phase 2&#10;Phase 3"
+            rows="4">${this.escHtml(labels)}</textarea>
+          <span class="form-hint">Names each round — great for Phase 10, Five Crowns, etc. Leave blank to use "Round 1, Round 2…"</span>
         </div>
         <div class="form-group">
           <label class="form-label" for="game-rules">Rules / Notes (optional)</label>
@@ -503,6 +511,7 @@ export class Settings {
       const modeInput = document.getElementById('game-mode') as HTMLSelectElement;
       const rulesInput = document.getElementById('game-rules') as HTMLTextAreaElement;
       const targetInput = document.getElementById('game-target') as HTMLInputElement;
+      const labelsInput = document.getElementById('game-round-labels') as HTMLTextAreaElement;
       const editingId = (document.getElementById('game-editing-id') as HTMLInputElement)?.value;
       const nameError = document.getElementById('game-name-error');
 
@@ -514,11 +523,17 @@ export class Settings {
       }
       if (nameError) nameError.textContent = '';
 
+      const roundLabels = labelsInput.value
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
+
       const gameData = {
         name,
         scoringMode: modeInput.value as Game['scoringMode'],
         rules: rulesInput.value.trim() || undefined,
         targetScore: targetInput.value ? parseInt(targetInput.value, 10) : undefined,
+        roundLabels: roundLabels.length > 0 ? roundLabels : undefined,
         createdAt: Date.now(),
       };
 
@@ -529,6 +544,7 @@ export class Settings {
             scoringMode: gameData.scoringMode,
             rules: gameData.rules,
             targetScore: gameData.targetScore,
+            roundLabels: gameData.roundLabels,
           });
           showToast('Game updated', 'success');
         } else {

@@ -20,6 +20,17 @@ export default defineConfig({
     __BUILD_TIME__: JSON.stringify(BUILD_TIME),
   },
   plugins: [
+    // Inject build info into the HTML loading screen — visible before any JS runs
+    {
+      name: 'inject-build-info',
+      transformIndexHtml(html: string) {
+        const ts = new Date(BUILD_TIME).toLocaleString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+        });
+        return html.replace('<!--BUILD_INFO-->', `v${APP_VERSION} · build ${BUILD_NUMBER} · ${ts}`);
+      },
+    },
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {

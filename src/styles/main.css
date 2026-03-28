@@ -12,7 +12,7 @@
   --border: #334155;
   --text: #f1f5f9;
   --text-muted: #94a3b8;
-  --nav-height: 64px;
+  --nav-height: 52px;
   --radius: 12px;
   --radius-sm: 8px;
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
@@ -113,7 +113,7 @@ button, input, select, textarea {
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  padding: 8px 4px;
+  padding: 6px 4px;
   transition: color var(--transition), background var(--transition);
   -webkit-tap-highlight-color: transparent;
   min-height: var(--nav-height);
@@ -129,9 +129,30 @@ button, input, select, textarea {
 }
 
 .nav-item svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+}
+
+@media (orientation: landscape) {
+  :root { --nav-height: 40px; }
+
+  .nav-item {
+    flex-direction: row;
+    gap: 0.35rem;
+    padding: 4px 6px;
+    font-size: 0.8rem;
+  }
+
+  .nav-item svg {
+    display: none;
+  }
+
+  .nav-item span,
+  .nav-item--active span {
+    font-size: 0.8rem;
+    letter-spacing: 0;
+  }
 }
 
 .nav-label {

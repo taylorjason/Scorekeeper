@@ -1,0 +1,113 @@
+# Game Night Scorekeeper App Specification
+
+## Overview
+
+This spec defines a static, mobile-first web app for tracking scores and stats during weekly friends' game nights. The app supports multiple games, player history, and persistent data storage. It deploys to GitHub Pages with browser-local storage (IndexedDB) as primary persistence and optional GitHub repo sync for backups.[1][2][3]
+
+**Key goals:**
+- Fast, one-handed score entry on phones.
+- Offline-first with automatic local saves.
+- Cross-session stats and history.
+- Optional cloud backup via GitHub API.
+
+## Architecture
+
+- **Front-end only**: HTML/CSS/JS (or React/Vue compiled to static).
+- **Local storage**: IndexedDB for structured data; localStorage for config/PAT.
+- **Sync**: Optional GitHub REST API (Contents endpoint) for JSON export/import.
+- **Offline**: Service Worker + PWA manifest for caching.
+- **Deployment**: GitHub Pages (static hosting limits apply).[4][5]
+
+No server, database, or auth beyond user-provided GitHub PAT.
+
+## Data Model
+
+Core entities stored in IndexedDB:
+
+| Entity | Fields |
+|---|---|
+| Player | `id`, `displayName`, `color`, `active`, `createdAt` |
+| Game | `id`, `name`, `scoringMode` (high/low/rounds), `rules`, `targetScore`, `createdAt` |
+| GameNight | `id`, `title`, `date`, `notes`, `createdAt` |
+| Match | `id`, `gameNightId`, `gameId`, `playerIds[]`, `status`, `winnerId`, `createdAt` |
+| ScoreEntry | `id`, `matchId`, `playerId`, `roundNumber`, `value`, `note`, `createdAt` |
+| StatSnapshot | `playerId`, `gameId`, `wins`, `losses`, `avgScore`, `lastPlayed` |
+| SyncConfig | `username`, `repo`, `pat` (localStorage), `filePath` ("data/game-stats.json"), `branch` ("main"), `lastSync` |
+
+Full app state exports to single JSON for sync.
+
+## Features
+
+### Core Flows
+1. **Dashboard**: Recent game nights, player stats overview.
+2. **New Game Night**: Add title/date, select games/players.
+3. **Scoring**: Quick entry by round/turn; live totals/rankings.
+4. **History**: Filter by player/game/night; trends (wins, avg).
+5. **Settings**: Manage players/games, sync config.
+
+### Scoring Modes
+- High score wins.
+- Low score wins.
+- Points per round.
+- Finish order.
+- Custom (target, bonuses).
+
+Undo/edit last entry; auto-detect winner.
+
+### Persistence & Sync
+- **Local**: Auto-save after every score; survives refresh/close.
+- **GitHub Sync**:
+  - Settings form: username/repo/PAT/filePath.
+  - Save: PUT JSON (base64) to file via API.
+  - Load: GET/decode/merge local.
+  - Test button; conflict prompts.
+  - Auto-prompt post-game night.[1]
+
+**PAT Setup**: User generates classic/fine-grained token with `repo`/`Contents: write` scope.[3]
+
+## UI/UX Guidelines
+
+- Mobile-first, large buttons, dark/light mode.
+- Screens: Dashboard, New Night, Active Match, History, Stats, Settings.
+- Frictionless scoring: Number pad, player chips.
+- Visuals: Colors per player, charts for trends.
+- Accessibility: ARIA, keyboard nav.
+
+## Technical Stack
+
+**Recommended**:
+- TypeScript.
+- IndexedDB (Dexie.js wrapper optional).
+- Fetch for GitHub API.
+- Chart.js for stats viz.
+- Tailwind/Vanilla CSS.
+- Vite for build (static output).
+
+**GitHub API**:
+```
+Auth: Authorization: Bearer ${pat}
+Read: GET /repos/{user}/{repo}/contents/{path}
+Write: PUT same, {message, content: btoa(JSON), sha}
+```
+Handle 403/429 errors.[1]
+
+**Security**: Store PAT in localStorage (warn UI); no server transmission.
+
+## Non-Functional
+
+- Offline after load.
+- Responsive (phone/tablet/desktop).
+- <500KB bundle.
+- PWA installable.
+- Data validation (no dupes, valid scores).
+
+## Acceptance Criteria
+
+- Create/track full game night; data persists locally.
+- View stats/history across sessions.
+- Sync saves/loads to GitHub (test connection works).
+- Graceful errors (no sync = local only).
+- Deployable to GitHub Pages (gh-pages branch).
+- Export/import JSON manual backup.
+
+

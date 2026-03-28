@@ -99,6 +99,11 @@ function renderAppShell(): void {
 
     <main id="view-container" class="main-content" role="main"></main>
 
+    <footer class="version-footer" aria-label="App version">
+      v${__APP_VERSION__} · build&nbsp;${__BUILD_NUMBER__}
+      <span class="version-time">${new Date(__BUILD_TIME__).toLocaleString()}</span>
+    </footer>
+
     <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
       <button class="nav-item" data-route="dashboard" aria-label="Dashboard">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

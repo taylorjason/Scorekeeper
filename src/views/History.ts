@@ -1,6 +1,6 @@
 import {
   getGameNights, getMatchesForNight, getScoreEntriesForMatch,
-  deleteGameNight, db
+  deleteGameNight, createMatch, db
 } from '../db';
 import { navigate } from '../router';
 import { showToast } from '../toast';
@@ -186,6 +186,9 @@ export class History {
           ${matchesHtml}
           <div style="padding-top:0.75rem; display:flex; justify-content:flex-end; gap:0.5rem; border-top: 1px solid var(--border); margin-top: 0.5rem">
             ${activeMatches.length > 0 ? `<button class="btn btn-primary btn-sm resume-btn" data-match-id="${activeMatches[0].match.id}">Resume Match</button>` : ''}
+            <button class="btn btn-secondary btn-sm add-match-btn" data-night-id="${night.id}" aria-label="Add match to ${this.escHtml(night.title)}">
+              + Add Match
+            </button>
             <button class="btn btn-danger btn-sm delete-night-btn" data-night-id="${night.id}" aria-label="Delete ${this.escHtml(night.title)}">
               Delete Night
             </button>
@@ -221,6 +224,92 @@ export class History {
         </div>
       </div>
     `;
+  }
+
+  private showAddMatchModal(nightId: number): void {
+    const existing = document.getElementById('add-match-modal');
+    if (existing) existing.remove();
+
+    const gameOptions = this.allGames.map(g =>
+      `<option value="${g.id}">${this.escHtml(g.name)}</option>`
+    ).join('');
+
+    const playerChecks = this.allPlayers.map(p => `
+      <label class="flex items-center gap-2" style="padding:0.25rem 0; cursor:pointer">
+        <input type="checkbox" name="player" value="${p.id}" style="accent-color:${p.color}">
+        <span class="player-dot" style="background:${p.color}"></span>
+        <span>${this.escHtml(p.displayName)}</span>
+      </label>
+    `).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'add-match-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Add Match');
+    modal.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h2 class="modal-title">Add Match</h2>
+          <button class="icon-btn modal-close-btn" aria-label="Close">✕</button>
+        </div>
+        <form id="add-match-form" data-night-id="${nightId}">
+          <div class="form-group">
+            <label class="form-label" for="add-match-game">Game</label>
+            <select id="add-match-game" class="form-input" required>
+              <option value="">— select a game —</option>
+              ${gameOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Players</div>
+            <div style="max-height:200px;overflow-y:auto;padding:0.25rem 0">
+              ${playerChecks}
+            </div>
+          </div>
+          <div class="flex gap-2" style="margin-top:1rem">
+            <button type="button" class="btn btn-secondary flex-1 modal-close-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary flex-1">Start Match</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close handlers
+    modal.querySelectorAll('.modal-close-btn, .modal-backdrop').forEach(el => {
+      el.addEventListener('click', () => modal.remove());
+    });
+
+    // Submit
+    const form = modal.querySelector('#add-match-form') as HTMLFormElement;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const gameId = parseInt((form.querySelector('#add-match-game') as HTMLSelectElement).value, 10);
+      if (!gameId) return;
+      const checked = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="player"]:checked'));
+      const playerIds = checked.map(cb => parseInt(cb.value, 10));
+      if (playerIds.length === 0) {
+        showToast('Select at least one player', 'error');
+        return;
+      }
+      try {
+        const matchId = await createMatch({
+          gameNightId: nightId,
+          gameId,
+          playerIds,
+          status: 'active',
+          createdAt: Date.now(),
+        });
+        modal.remove();
+        navigate('match', { id: String(matchId) });
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to create match', 'error');
+      }
+    });
   }
 
   afterRender(): void {
@@ -286,6 +375,15 @@ export class History {
           console.error(err);
           showToast('Failed to delete game night', 'error');
         }
+      });
+    });
+
+    // Add match buttons
+    document.querySelectorAll('.add-match-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nightId = parseInt((e.currentTarget as HTMLElement).dataset['nightId'] ?? '', 10);
+        this.showAddMatchModal(nightId);
       });
     });
 

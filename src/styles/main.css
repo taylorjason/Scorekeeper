@@ -1395,6 +1395,43 @@ button, input, select, textarea {
   }
 }
 
+/* ─── Modal ─────────────────────────────────────────────────────────────────── */
+#add-match-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+}
+.modal-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: 1rem 1rem 0 0;
+  padding: 1.25rem 1rem 2rem;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
 /* ─── Version Footer ────────────────────────────────────────────────────────── */
 .version-footer {
   position: fixed;

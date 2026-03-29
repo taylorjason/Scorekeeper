@@ -63,11 +63,13 @@ export interface StatSnapshot {
   lastPlayed: number; // timestamp
 }
 
-// SyncConfig for GitHub API integration
+// SyncConfig for GitHub / Gitea API integration
 export interface SyncConfig {
+  provider: 'github' | 'gitea'; // which forge to sync with
+  baseUrl?: string;              // Gitea only: e.g. "https://gitea.example.com"
   username: string;
   repo: string;
-  pat: string;
+  pat: string;                   // GitHub PAT or Gitea API key
   filePath: string;
   branch: string;
   lastSync?: number; // timestamp

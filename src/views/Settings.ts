@@ -330,6 +330,7 @@ export class Settings {
             <option value="rounds" ${mode === 'rounds' ? 'selected' : ''}>Rounds (per-round input)</option>
             <option value="finish-order" ${mode === 'finish-order' ? 'selected' : ''}>Finish order (1st, 2nd...)</option>
             <option value="custom" ${mode === 'custom' ? 'selected' : ''}>Custom</option>
+            <option value="phase10" ${mode === 'phase10' ? 'selected' : ''}>Phase 10 (track phases + penalty points)</option>
           </select>
         </div>
         <div class="form-group">

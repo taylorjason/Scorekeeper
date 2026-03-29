@@ -8,7 +8,7 @@ export interface Player {
 }
 
 // Scoring modes for games
-export type ScoringMode = 'high' | 'low' | 'rounds' | 'finish-order' | 'custom';
+export type ScoringMode = 'high' | 'low' | 'rounds' | 'finish-order' | 'custom' | 'phase10';
 
 // Game represents a board game / card game
 export interface Game {

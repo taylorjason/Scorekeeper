@@ -1395,6 +1395,26 @@ button, input, select, textarea {
   }
 }
 
+/* ─── Phase 10 ──────────────────────────────────────────────────────────────── */
+.phase10-player-row {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.phase10-player-row:last-child {
+  border-bottom: none;
+}
+.phase10-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+.phase10-badge.phase10-done {
+  background: var(--success);
+}
+
 /* ─── Modal ─────────────────────────────────────────────────────────────────── */
 #add-match-modal {
   position: fixed;

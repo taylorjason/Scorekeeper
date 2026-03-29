@@ -431,7 +431,7 @@ export class Settings {
           this.players = this.players.filter(p => p.id !== pid);
           const listEl = document.getElementById('players-list');
           if (listEl) listEl.innerHTML = this.renderPlayersList();
-          this.afterRender();
+          this.bindPlayerForm();
           showToast('Player deleted', 'info');
         } catch {
           showToast('Failed to delete player', 'error');
@@ -443,7 +443,13 @@ export class Settings {
   }
 
   private bindPlayerFormSubmit(): void {
-    document.getElementById('player-form')?.addEventListener('submit', async (e) => {
+    // Clone-replace the form element to clear any previously attached submit listeners,
+    // preventing duplicate submissions when this method is called more than once.
+    const old = document.getElementById('player-form');
+    if (!old) return;
+    const form = old.cloneNode(true) as HTMLElement;
+    old.replaceWith(form);
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const nameInput = document.getElementById('player-name') as HTMLInputElement;
       const colorInput = document.getElementById('player-color') as HTMLInputElement;
@@ -540,7 +546,11 @@ export class Settings {
   }
 
   private bindGameFormSubmit(): void {
-    document.getElementById('game-form')?.addEventListener('submit', async (e) => {
+    const old = document.getElementById('game-form');
+    if (!old) return;
+    const form = old.cloneNode(true) as HTMLElement;
+    old.replaceWith(form);
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const nameInput = document.getElementById('game-name') as HTMLInputElement;
       const modeInput = document.getElementById('game-mode') as HTMLSelectElement;

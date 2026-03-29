@@ -3,7 +3,7 @@ import {
   getGames, createGame, updateGame, deleteGame,
   exportAll, importAll, db
 } from '../db';
-import { getSyncConfig, saveSyncConfig, testConnection, syncToGitHub, syncFromGitHub } from '../github';
+import { getSyncConfig, saveSyncConfig, testConnection, syncToGitHub, syncFromGitHub, validateSyncConfig } from '../github';
 import { showToast } from '../toast';
 import type { Player, Game, SyncConfig } from '../types';
 
@@ -74,22 +74,47 @@ export class Settings {
           </div>
         </section>
 
-        <!-- GitHub Sync Section -->
+        <!-- Sync Section -->
         <section class="settings-section" aria-labelledby="sync-section-heading">
           <h2 class="settings-section-title" id="sync-section-heading">
-            <span>☁️</span> GitHub Sync
+            <span>☁️</span> Sync
           </h2>
 
           <div class="alert alert-warning mb-3">
             <span>⚠️</span>
-            <span>Your Personal Access Token (PAT) is stored in localStorage. Never share your PAT or use it on untrusted devices.</span>
+            <span>Your API key / token is stored in localStorage. Never share it or use it on untrusted devices.</span>
           </div>
 
           <div class="card">
             <form id="sync-form" novalidate>
+
+              <!-- Provider picker -->
+              <div class="form-group">
+                <label class="form-label">Provider</label>
+                <div class="provider-toggle" role="group" aria-label="Sync provider">
+                  <button type="button" class="provider-btn ${(this.syncConfig?.provider ?? 'github') === 'github' ? 'active' : ''}"
+                    id="provider-github" data-provider="github" aria-pressed="${(this.syncConfig?.provider ?? 'github') === 'github'}">
+                    GitHub
+                  </button>
+                  <button type="button" class="provider-btn ${this.syncConfig?.provider === 'gitea' ? 'active' : ''}"
+                    id="provider-gitea" data-provider="gitea" aria-pressed="${this.syncConfig?.provider === 'gitea'}">
+                    Gitea
+                  </button>
+                </div>
+              </div>
+
+              <!-- Gitea-only: base URL -->
+              <div class="form-group" id="sync-baseurl-group" style="display:${this.syncConfig?.provider === 'gitea' ? 'block' : 'none'}">
+                <label class="form-label" for="sync-baseurl">Gitea Base URL</label>
+                <input class="form-input" type="url" id="sync-baseurl"
+                  placeholder="https://gitea.example.com" autocomplete="off"
+                  value="${this.syncConfig?.baseUrl ? this.escHtml(this.syncConfig.baseUrl) : ''}" />
+                <span class="form-hint">Your Gitea instance URL, no trailing slash</span>
+              </div>
+
               <div class="form-row">
                 <div class="form-group">
-                  <label class="form-label" for="sync-username">GitHub Username</label>
+                  <label class="form-label" for="sync-username">Username</label>
                   <input class="form-input" type="text" id="sync-username"
                     placeholder="octocat" autocomplete="off"
                     value="${this.syncConfig ? this.escHtml(this.syncConfig.username) : ''}" />
@@ -101,13 +126,22 @@ export class Settings {
                     value="${this.syncConfig ? this.escHtml(this.syncConfig.repo) : ''}" />
                 </div>
               </div>
+
               <div class="form-group">
-                <label class="form-label" for="sync-pat">Personal Access Token</label>
+                <label class="form-label" for="sync-pat" id="sync-pat-label">
+                  ${this.syncConfig?.provider === 'gitea' ? 'API Key' : 'Personal Access Token'}
+                </label>
                 <input class="form-input" type="password" id="sync-pat"
-                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off"
+                  placeholder="${this.syncConfig?.provider === 'gitea' ? 'your-api-key' : 'ghp_xxxxxxxxxxxxxxxxxxxx'}"
+                  autocomplete="off"
                   value="${this.syncConfig ? this.escHtml(this.syncConfig.pat) : ''}" />
-                <span class="form-hint">Needs <code>repo</code> scope</span>
+                <span class="form-hint" id="sync-pat-hint">
+                  ${this.syncConfig?.provider === 'gitea'
+                    ? 'Settings → Applications → Generate Token (needs repository read/write)'
+                    : 'Needs <code>repo</code> scope'}
+                </span>
               </div>
+
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="sync-filepath">File Path</label>
@@ -122,13 +156,14 @@ export class Settings {
                     value="${this.syncConfig ? this.escHtml(this.syncConfig.branch) : 'main'}" />
                 </div>
               </div>
+
               <div class="text-sm text-muted mb-3">
                 Last sync: <strong id="last-sync-time">${this.formatTimestamp(this.syncConfig?.lastSync)}</strong>
               </div>
               <div class="btn-group">
                 <button type="button" class="btn btn-secondary" id="test-connection-btn">Test</button>
-                <button type="button" class="btn btn-primary flex-1" id="sync-to-github-btn">↑ Push to GitHub</button>
-                <button type="button" class="btn btn-secondary flex-1" id="sync-from-github-btn">↓ Pull from GitHub</button>
+                <button type="button" class="btn btn-primary flex-1" id="sync-to-github-btn">↑ Push</button>
+                <button type="button" class="btn btn-secondary flex-1" id="sync-from-github-btn">↓ Pull</button>
               </div>
             </form>
           </div>
@@ -295,6 +330,7 @@ export class Settings {
             <option value="rounds" ${mode === 'rounds' ? 'selected' : ''}>Rounds (per-round input)</option>
             <option value="finish-order" ${mode === 'finish-order' ? 'selected' : ''}>Finish order (1st, 2nd...)</option>
             <option value="custom" ${mode === 'custom' ? 'selected' : ''}>Custom</option>
+            <option value="phase10" ${mode === 'phase10' ? 'selected' : ''}>Phase 10 (track phases + penalty points)</option>
           </select>
         </div>
         <div class="form-group">
@@ -396,7 +432,7 @@ export class Settings {
           this.players = this.players.filter(p => p.id !== pid);
           const listEl = document.getElementById('players-list');
           if (listEl) listEl.innerHTML = this.renderPlayersList();
-          this.afterRender();
+          this.bindPlayerForm();
           showToast('Player deleted', 'info');
         } catch {
           showToast('Failed to delete player', 'error');
@@ -408,7 +444,13 @@ export class Settings {
   }
 
   private bindPlayerFormSubmit(): void {
-    document.getElementById('player-form')?.addEventListener('submit', async (e) => {
+    // Clone-replace the form element to clear any previously attached submit listeners,
+    // preventing duplicate submissions when this method is called more than once.
+    const old = document.getElementById('player-form');
+    if (!old) return;
+    const form = old.cloneNode(true) as HTMLElement;
+    old.replaceWith(form);
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const nameInput = document.getElementById('player-name') as HTMLInputElement;
       const colorInput = document.getElementById('player-color') as HTMLInputElement;
@@ -505,7 +547,11 @@ export class Settings {
   }
 
   private bindGameFormSubmit(): void {
-    document.getElementById('game-form')?.addEventListener('submit', async (e) => {
+    const old = document.getElementById('game-form');
+    if (!old) return;
+    const form = old.cloneNode(true) as HTMLElement;
+    old.replaceWith(form);
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const nameInput = document.getElementById('game-name') as HTMLInputElement;
       const modeInput = document.getElementById('game-mode') as HTMLSelectElement;
@@ -570,20 +616,57 @@ export class Settings {
   }
 
   private bindSyncForm(): void {
+    // Track selected provider reactively in the form (without full re-render)
+    let activeProvider: SyncConfig['provider'] =
+      this.syncConfig?.provider ?? 'github';
+
+    const applyProvider = (p: SyncConfig['provider']) => {
+      activeProvider = p;
+
+      // Toggle button styles
+      document.querySelectorAll<HTMLButtonElement>('.provider-btn').forEach(btn => {
+        const isActive = btn.dataset['provider'] === p;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', String(isActive));
+      });
+
+      // Show/hide base-URL field
+      const baseUrlGroup = document.getElementById('sync-baseurl-group') as HTMLElement | null;
+      if (baseUrlGroup) baseUrlGroup.style.display = p === 'gitea' ? 'block' : 'none';
+
+      // Update PAT label & hint
+      const patLabel = document.getElementById('sync-pat-label');
+      const patInput = document.getElementById('sync-pat') as HTMLInputElement | null;
+      const patHint  = document.getElementById('sync-pat-hint');
+      if (patLabel) patLabel.textContent = p === 'gitea' ? 'API Key' : 'Personal Access Token';
+      if (patInput) patInput.placeholder = p === 'gitea' ? 'your-api-key' : 'ghp_xxxxxxxxxxxxxxxxxxxx';
+      if (patHint)  patHint.innerHTML = p === 'gitea'
+        ? 'Settings → Applications → Generate Token (needs repository read/write)'
+        : 'Needs <code>repo</code> scope';
+    };
+
+    document.querySelectorAll<HTMLButtonElement>('.provider-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        applyProvider(btn.dataset['provider'] as SyncConfig['provider']);
+      });
+    });
+
     const getFormConfig = (): SyncConfig => ({
+      provider: activeProvider,
+      baseUrl: activeProvider === 'gitea'
+        ? (document.getElementById('sync-baseurl') as HTMLInputElement).value.trim().replace(/\/+$/, '')
+        : undefined,
       username: (document.getElementById('sync-username') as HTMLInputElement).value.trim(),
-      repo: (document.getElementById('sync-repo') as HTMLInputElement).value.trim(),
-      pat: (document.getElementById('sync-pat') as HTMLInputElement).value.trim(),
+      repo:     (document.getElementById('sync-repo')     as HTMLInputElement).value.trim(),
+      pat:      (document.getElementById('sync-pat')      as HTMLInputElement).value.trim(),
       filePath: (document.getElementById('sync-filepath') as HTMLInputElement).value.trim() || 'scorekeeper.json',
-      branch: (document.getElementById('sync-branch') as HTMLInputElement).value.trim() || 'main',
+      branch:   (document.getElementById('sync-branch')   as HTMLInputElement).value.trim() || 'main',
       lastSync: this.syncConfig?.lastSync,
     });
 
     const validateConfig = (config: SyncConfig): boolean => {
-      if (!config.username || !config.repo || !config.pat) {
-        showToast('Fill in username, repo, and PAT', 'error');
-        return false;
-      }
+      const err = validateSyncConfig(config);
+      if (err) { showToast(err, 'error'); return false; }
       return true;
     };
 
@@ -591,25 +674,20 @@ export class Settings {
       const config = getFormConfig();
       if (!validateConfig(config)) return;
       const btn = document.getElementById('test-connection-btn') as HTMLButtonElement;
-      btn.disabled = true;
-      btn.textContent = 'Testing...';
+      btn.disabled = true; btn.textContent = 'Testing…';
       try {
         saveSyncConfig(config);
         this.syncConfig = config;
         const result = await testConnection(config);
         showToast(result.message, result.ok ? 'success' : 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Test';
-      }
+      } finally { btn.disabled = false; btn.textContent = 'Test'; }
     });
 
     document.getElementById('sync-to-github-btn')?.addEventListener('click', async () => {
       const config = getFormConfig();
       if (!validateConfig(config)) return;
       const btn = document.getElementById('sync-to-github-btn') as HTMLButtonElement;
-      btn.disabled = true;
-      btn.textContent = 'Pushing...';
+      btn.disabled = true; btn.textContent = 'Pushing…';
       try {
         saveSyncConfig(config);
         this.syncConfig = config;
@@ -620,30 +698,26 @@ export class Settings {
           const timeEl = document.getElementById('last-sync-time');
           if (timeEl) timeEl.textContent = this.formatTimestamp(this.syncConfig?.lastSync);
         }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '↑ Push to GitHub';
-      }
+      } finally { btn.disabled = false; btn.textContent = '↑ Push'; }
     });
 
     document.getElementById('sync-from-github-btn')?.addEventListener('click', async () => {
       const config = getFormConfig();
       if (!validateConfig(config)) return;
       const btn = document.getElementById('sync-from-github-btn') as HTMLButtonElement;
-      btn.disabled = true;
-      btn.textContent = 'Pulling...';
+      btn.disabled = true; btn.textContent = 'Pulling…';
       try {
         saveSyncConfig(config);
         this.syncConfig = config;
-        const result = await syncFromGitHub(config, async () => {
-          return confirm('Local data exists. Overwrite with GitHub data? This cannot be undone.');
-        });
+        const label = config.provider === 'gitea' ? 'Gitea' : 'GitHub';
+        const result = await syncFromGitHub(config, async () =>
+          confirm(`Local data exists. Overwrite with ${label} data? This cannot be undone.`)
+        );
         showToast(result.message, result.ok ? 'success' : 'error');
         if (result.ok) {
           this.syncConfig = getSyncConfig();
           const timeEl = document.getElementById('last-sync-time');
           if (timeEl) timeEl.textContent = this.formatTimestamp(this.syncConfig?.lastSync);
-          // Reload players/games since they may have changed
           await this.load();
           const playersEl = document.getElementById('players-list');
           if (playersEl) playersEl.innerHTML = this.renderPlayersList();
@@ -652,10 +726,7 @@ export class Settings {
           this.bindPlayerForm();
           this.bindGameForm();
         }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '↓ Pull from GitHub';
-      }
+      } finally { btn.disabled = false; btn.textContent = '↓ Pull'; }
     });
   }
 

@@ -505,6 +505,31 @@ button, input, select, textarea {
 
 /* ─── Score Cards ────────────────────────────────────────────────────────────── */
 /* ─── Card / Table toggle ────────────────────────────────────────────────── */
+.provider-toggle { /* same pill layout as .view-toggle-bar */
+  display: flex;
+  gap: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  width: fit-content;
+}
+.provider-btn {
+  padding: 0.35rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.provider-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
 .view-toggle-bar {
   display: flex;
   gap: 0.25rem;
@@ -1368,6 +1393,63 @@ button, input, select, textarea {
   .app-header {
     padding: 0.3rem 0.875rem;
   }
+}
+
+/* ─── Phase 10 ──────────────────────────────────────────────────────────────── */
+.phase10-player-row {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.phase10-player-row:last-child {
+  border-bottom: none;
+}
+.phase10-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+.phase10-badge.phase10-done {
+  background: var(--success);
+}
+
+/* ─── Modal ─────────────────────────────────────────────────────────────────── */
+#add-match-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+}
+.modal-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: 1rem 1rem 0 0;
+  padding: 1.25rem 1rem 2rem;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
 }
 
 /* ─── Version Footer ────────────────────────────────────────────────────────── */

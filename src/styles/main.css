@@ -1791,3 +1791,233 @@ button, input, select, textarea {
     margin-top: 0;
   }
 }
+
+
+/* ─── Current round banner ───────────────────────────────────────────────────── */
+.current-round-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0 0.625rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.01em;
+}
+.current-round-banner .round-banner-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+@media (min-width: 900px) {
+  .current-round-banner {
+    font-size: 1.5rem;
+    padding: 0 0 0.75rem;
+  }
+}
+
+/* ─── Scoreboard Mode ────────────────────────────────────────────────────────── */
+.scoreboard-mode .app-header,
+.scoreboard-mode .bottom-nav,
+.scoreboard-mode .version-footer {
+  display: none !important;
+}
+.scoreboard-mode .main-content {
+  padding-bottom: 0;
+  padding-top: 0;
+  max-width: 100%;
+}
+
+/* ─── Scoreboard View ────────────────────────────────────────────────────────── */
+.scoreboard {
+  min-height: 100vh;
+  background: #080d1a;
+  color: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1.5rem 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.sb-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.sb-header-left { flex: 1; min-width: 0; }
+.sb-header-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+
+.sb-game-name {
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.2;
+}
+.sb-night-name {
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
+  color: #64748b;
+  margin-top: 0.2rem;
+}
+
+.sb-live {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #10b981;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.sb-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: sb-pulse 2s ease-in-out infinite;
+}
+@keyframes sb-pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+.sb-badge-final {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(99,102,241,0.2);
+  color: #a5b4fc;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sb-close {
+  background: rgba(255,255,255,0.07);
+  border: none;
+  color: #64748b;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.sb-close:hover { background: rgba(255,255,255,0.15); color: #f1f5f9; }
+
+.sb-error { padding: 2rem; color: #ef4444; text-align: center; }
+
+/* Player cards */
+.sb-players {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.sb-player {
+  background: #111827;
+  border-radius: 14px;
+  padding: clamp(0.9rem, 2vw, 1.5rem) clamp(1rem, 2.5vw, 1.75rem);
+  display: flex;
+  align-items: center;
+  gap: clamp(0.75rem, 2vw, 1.25rem);
+  border-left: 4px solid var(--pc, #6366f1);
+  transition: transform 0.3s ease;
+}
+
+.sb-rank-area { min-width: 2.25rem; text-align: center; flex-shrink: 0; }
+.sb-medal { font-size: clamp(1.5rem, 3.5vw, 2.25rem); line-height: 1; }
+.sb-rank-num {
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  font-weight: 700;
+  color: #475569;
+}
+
+.sb-avatar {
+  width: clamp(2.5rem, 5vw, 3.5rem);
+  height: clamp(2.5rem, 5vw, 3.5rem);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sb-name-area { flex: 1; min-width: 0; }
+.sb-name {
+  font-size: clamp(1.1rem, 3vw, 1.75rem);
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-score-area { flex-shrink: 0; text-align: right; }
+.sb-score {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  color: #f1f5f9;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.sb-gap {
+  font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+  color: #475569;
+  margin-top: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.sb-phase {
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  font-weight: 700;
+  color: #818cf8;
+  line-height: 1;
+}
+.sb-penalty {
+  font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+  color: #64748b;
+  margin-top: 0.2rem;
+}
+
+/* 1st place emphasis */
+.sb-player.sb-rank-1 {
+  background: linear-gradient(135deg, #15192e 0%, #111827 100%);
+}
+.sb-player.sb-rank-1 .sb-score { color: #fbbf24; }
+.sb-player.sb-rank-1 .sb-name { color: #fff; }
+
+/* Landscape / tablet: 2-column grid */
+@media (min-width: 640px) and (orientation: landscape) {
+  .sb-players {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-content: start;
+  }
+}
+
+/* Large screens (TV) */
+@media (min-width: 1200px) {
+  .scoreboard { padding: 2rem 2.5rem 1.5rem; }
+  .sb-players {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+}
+
+.sb-footer {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #1e293b;
+  user-select: none;
+}
+

@@ -4,6 +4,14 @@ import { exportAll, importAll } from './db';
 const ROOM_CONFIG_KEY = 'scorekeeper_firebase_room';
 const DEVICE_ID_KEY = 'scorekeeper_device_id';
 
+// Hardcoded — Firebase API keys are public identifiers, not secrets.
+// Security is enforced by Firestore Rules (auth required).
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyBbZi_h_jLEi3ioJ1IBpGq2x4Uk7XN1mKA',
+  projectId: 'scorekeeper-c9b39',
+  appId: '1:762963882089:web:68bafeb234d5d05f5d32f8',
+};
+
 // ─── Device ID ───────────────────────────────────────────────────────────────
 
 function getDeviceId(): string {
@@ -44,25 +52,24 @@ export function generateRoomId(): string {
 // ─── Shareable URL ────────────────────────────────────────────────────────────
 
 export function buildShareableUrl(config: FirebaseRoomConfig): string {
-  const payload = {
-    apiKey: config.apiKey,
-    projectId: config.projectId,
-    appId: config.appId,
-    roomId: config.roomId,
-  };
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   const base = window.location.origin + window.location.pathname.replace(/\/+$/, '');
-  return `${base}#room=${encoded}`;
+  return `${base}#room=${encodeURIComponent(config.roomId)}`;
 }
 
 export function parseRoomFromHash(): Omit<FirebaseRoomConfig, 'lastSync'> | null {
   try {
     const hash = window.location.hash;
     if (!hash.startsWith('#room=')) return null;
-    const encoded = hash.slice('#room='.length);
-    const payload = JSON.parse(decodeURIComponent(escape(atob(encoded)))) as FirebaseRoomConfig;
-    if (!payload.apiKey || !payload.projectId || !payload.appId || !payload.roomId) return null;
-    return payload;
+    const value = hash.slice('#room='.length);
+
+    // Backward compat: old links encoded the full config as base64 JSON
+    try {
+      const payload = JSON.parse(decodeURIComponent(escape(atob(value)))) as FirebaseRoomConfig;
+      if (payload.roomId) return { roomId: payload.roomId };
+    } catch { /* not base64 JSON — fall through to plain room ID */ }
+
+    const roomId = decodeURIComponent(value);
+    return roomId ? { roomId } : null;
   } catch {
     return null;
   }
@@ -126,11 +133,12 @@ export async function initFirebaseSync(
     const { getFirestore, initializeFirestore, doc, onSnapshot, setDoc, getDoc } = await import('firebase/firestore');
     const { getAuth, signInAnonymously } = await import('firebase/auth');
 
+    const projectId = config.projectId ?? DEFAULT_FIREBASE_CONFIG.projectId;
     const firebaseConfig = {
-      apiKey: config.apiKey,
-      projectId: config.projectId,
-      appId: config.appId,
-      authDomain: `${config.projectId}.firebaseapp.com`,
+      apiKey: config.apiKey ?? DEFAULT_FIREBASE_CONFIG.apiKey,
+      projectId,
+      appId: config.appId ?? DEFAULT_FIREBASE_CONFIG.appId,
+      authDomain: `${projectId}.firebaseapp.com`,
     };
 
     const appAlreadyExists = getApps().length > 0;

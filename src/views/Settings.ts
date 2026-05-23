@@ -278,64 +278,25 @@ export class Settings {
     }
 
     // Not connected — show setup form
-    const pendingApiKey = cfg?.apiKey ?? '';
-    const pendingProjectId = cfg?.projectId ?? '';
-    const pendingAppId = cfg?.appId ?? '';
     const pendingRoomId = cfg?.roomId ?? generateRoomId();
 
     return `
       <div class="alert alert-info mb-3">
         <span>ℹ️</span>
-        <span>Real-time sync for your friend group — no login needed. Everyone shares one room.</span>
+        <span>Real-time sync for your friend group — no login needed. Create a room or enter one someone shared with you.</span>
       </div>
-
-      <details class="card mb-3" id="fb-setup-instructions">
-        <summary class="font-semibold" style="cursor:pointer;padding:0.5rem 0">
-          How to set up Firebase (one-time, free)
-        </summary>
-        <ol class="text-sm" style="margin:0.75rem 0 0 1.25rem;line-height:1.8">
-          <li>Go to <strong>console.firebase.google.com</strong> → Create a project</li>
-          <li>In the project: <strong>Build → Firestore Database</strong> → Create database → Start in <em>test mode</em></li>
-          <li><strong>Build → Authentication</strong> → Get started → Anonymous → Enable</li>
-          <li><strong>Project Settings</strong> (gear icon) → <em>Your apps</em> → Add app → Web → Register</li>
-          <li>Copy the <code>apiKey</code>, <code>projectId</code>, and <code>appId</code> from the config snippet below</li>
-        </ol>
-        <div class="alert alert-warning mt-2 text-sm">
-          <span>⚠️</span>
-          <span>After setup, go to Firestore → Rules and set: <code>allow read, write: if request.auth != null;</code> to keep your data private to authenticated sessions only.</span>
-        </div>
-      </details>
 
       <div class="card">
         <form id="fb-config-form" novalidate>
           <div class="form-group">
-            <label class="form-label" for="fb-api-key">API Key</label>
-            <input class="form-input" type="text" id="fb-api-key"
-              placeholder="AIzaSy..." autocomplete="off"
-              value="${this.escHtml(pendingApiKey)}" />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="fb-project-id">Project ID</label>
-              <input class="form-input" type="text" id="fb-project-id"
-                placeholder="my-scorekeeper" autocomplete="off"
-                value="${this.escHtml(pendingProjectId)}" />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="fb-app-id">App ID</label>
-              <input class="form-input" type="text" id="fb-app-id"
-                placeholder="1:123:web:abc" autocomplete="off"
-                value="${this.escHtml(pendingAppId)}" />
-            </div>
-          </div>
-          <div class="form-group">
             <label class="form-label" for="fb-room-id">Room ID</label>
             <div class="input-group">
               <input class="form-input font-mono" type="text" id="fb-room-id"
-                value="${this.escHtml(pendingRoomId)}" autocomplete="off" />
+                value="${this.escHtml(pendingRoomId)}" autocomplete="off"
+                placeholder="Enter a room ID or generate one" />
               <button class="btn btn-secondary" type="button" id="fb-new-room-btn">New</button>
             </div>
-            <span class="form-hint">A random ID shared with your group. Click New to generate a fresh one.</span>
+            <span class="form-hint">Share this ID with friends so you all sync to the same room.</span>
           </div>
           <button class="btn btn-primary btn-full" type="submit" id="fb-connect-btn">
             Connect &amp; Sync
@@ -591,17 +552,14 @@ export class Settings {
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const apiKey    = (document.getElementById('fb-api-key')     as HTMLInputElement).value.trim();
-      const projectId = (document.getElementById('fb-project-id')  as HTMLInputElement).value.trim();
-      const appId     = (document.getElementById('fb-app-id')      as HTMLInputElement).value.trim();
-      const roomId    = (document.getElementById('fb-room-id')     as HTMLInputElement).value.trim();
+      const roomId = (document.getElementById('fb-room-id') as HTMLInputElement).value.trim();
 
-      if (!apiKey || !projectId || !appId || !roomId) {
-        showToast('All fields are required', 'error');
+      if (!roomId) {
+        showToast('Room ID is required', 'error');
         return;
       }
 
-      const config: FirebaseRoomConfig = { apiKey, projectId, appId, roomId };
+      const config: FirebaseRoomConfig = { roomId };
       saveRoomConfig(config);
       this.roomConfig = config;
 

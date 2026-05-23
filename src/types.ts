@@ -64,10 +64,11 @@ export interface StatSnapshot {
 }
 
 // FirebaseRoomConfig for real-time Firestore sync
+// apiKey/projectId/appId are optional — the app has them hardcoded
 export interface FirebaseRoomConfig {
-  apiKey: string;
-  projectId: string;
-  appId: string;
+  apiKey?: string;
+  projectId?: string;
+  appId?: string;
   roomId: string;
   lastSync?: number;
 }

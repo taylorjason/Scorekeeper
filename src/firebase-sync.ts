@@ -123,7 +123,7 @@ export async function initFirebaseSync(
 
   try {
     const { initializeApp, getApps, getApp } = await import('firebase/app');
-    const { getFirestore, doc, onSnapshot, setDoc, getDoc } = await import('firebase/firestore');
+    const { getFirestore, initializeFirestore, doc, onSnapshot, setDoc, getDoc } = await import('firebase/firestore');
     const { getAuth, signInAnonymously } = await import('firebase/auth');
 
     const firebaseConfig = {
@@ -133,8 +133,11 @@ export async function initFirebaseSync(
       authDomain: `${config.projectId}.firebaseapp.com`,
     };
 
-    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    _firestoreDb = getFirestore(app);
+    const appAlreadyExists = getApps().length > 0;
+    const app = appAlreadyExists ? getApp() : initializeApp(firebaseConfig);
+    _firestoreDb = appAlreadyExists
+      ? getFirestore(app)
+      : initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
     const auth = getAuth(app);
     await signInAnonymously(auth);
 

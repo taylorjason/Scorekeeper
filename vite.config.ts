@@ -39,6 +39,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallbackDenylist: [/\/dev-env\//],
       },
       manifest: {
         name: 'Game Night Scorekeeper',

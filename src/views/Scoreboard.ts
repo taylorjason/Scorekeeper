@@ -119,9 +119,9 @@ export class Scoreboard {
           const gap = isLow
             ? ps.total - this.playerScores[0].total
             : this.playerScores[0].total - ps.total;
-          if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '-'}${gap}</div>`;
+          if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '−'}${gap} back</div>`;
         }
-        // Regular: 2 rows — name, then score + gap on one line
+        // Regular: 2 rows — name, then score with gap badge below it
         scoreHtml = `
           <div class="sb-score-area">
             <div class="sb-score">${ps.total}</div>

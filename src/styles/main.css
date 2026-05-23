@@ -570,13 +570,13 @@ button, input, select, textarea {
 .score-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 1.275rem;
   min-width: 280px;
 }
 .score-table th {
   padding: 0.55rem 0.6rem;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 1.125rem;
   font-weight: 600;
   white-space: nowrap;
   background: var(--surface);
@@ -584,7 +584,7 @@ button, input, select, textarea {
 .score-table-corner {
   text-align: left !important;
   color: var(--text-muted);
-  font-size: 0.7rem !important;
+  font-size: 1.05rem !important;
 }
 .score-table-round-row {
   background: var(--surface);
@@ -593,23 +593,23 @@ button, input, select, textarea {
   background: var(--bg);
 }
 .score-table-totals-row {
-  background: var(--surface);
-  border-top: 2px solid var(--border);
+  background: rgba(99, 102, 241, 0.07);
+  border-bottom: 2px solid var(--primary);
   font-weight: 700;
 }
 .score-table-label {
   padding: 0.45rem 0.6rem;
-  font-size: 0.75rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
   border-right: 1px solid var(--border);
 }
 .score-table-label-total {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  font-style: italic;
+  padding: 0.45rem 0.6rem;
+  font-size: 1.05rem;
+  color: var(--primary);
+  font-weight: 700;
   border-right: 1px solid var(--border);
 }
 .score-table-score {
@@ -621,7 +621,7 @@ button, input, select, textarea {
 .score-table-total {
   padding: 0.3rem 0.5rem;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 1.125rem;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
 }
@@ -629,6 +629,7 @@ button, input, select, textarea {
   padding: 0.5rem 0.5rem;
   text-align: center;
   font-weight: 700;
+  font-size: 1.275rem;
   color: var(--primary);
 }
 
@@ -1766,7 +1767,6 @@ button, input, select, textarea {
     font-size: 1.375rem;
   }
   .score-grid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 1rem;
   }
 
@@ -1788,5 +1788,30 @@ button, input, select, textarea {
   /* Remove stacked top-margin on the first card in the right column */
   .match-col-right .card:first-child {
     margin-top: 0;
+  }
+}
+
+/* ─── Current round banner ───────────────────────────────────────────────────── */
+.current-round-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0 0.625rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.01em;
+}
+.current-round-banner .round-banner-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+@media (min-width: 900px) {
+  .current-round-banner {
+    font-size: 1.5rem;
+    padding: 0 0 0.75rem;
   }
 }

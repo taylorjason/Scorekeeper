@@ -130,14 +130,12 @@ export class ActiveMatch {
       return `<div class="text-sm text-muted" style="padding:1rem 0; text-align:center">No scores yet — add a round to see the table.</div>`;
     }
 
-    // Collect all round numbers in order
-    const roundNums = [...new Set(this.entries.map(e => e.roundNumber))].sort((a, b) => a - b);
+    const isPhase10 = this.game?.scoringMode === 'phase10';
 
-    // Build running totals: runningTotals[playerId][after round index] = cumulative sum
-    const runningTotals = new Map<number, number>(); // playerId -> running total
-    for (const p of this.players) runningTotals.set(p.id!, 0);
+    // Collect round numbers; display most-recent first
+    const roundNums = [...new Set(this.entries.map(e => e.roundNumber))]
+      .sort((a, b) => b - a); // descending
 
-    // Header
     const headerCells = this.players.map(p =>
       `<th style="background:${p.color}22; border-bottom: 2px solid ${p.color}">
         <div class="flex items-center gap-1 justify-center">
@@ -147,14 +145,16 @@ export class ActiveMatch {
       </th>`
     ).join('');
 
-    // Rows — one score row + one running-total row per round
+    // Totals row pinned under the header
+    const totalCells = this.players.map(p => {
+      const ps = this.playerScores.find(s => s.player.id === p.id);
+      return `<td class="score-table-footer">${ps?.total ?? 0}</td>`;
+    }).join('');
+
+    // Round rows — newest at top
     let rows = '';
     for (const rn of roundNums) {
       const roundEntries = this.entries.filter(e => e.roundNumber === rn);
-
-      const isPhase10 = this.game?.scoringMode === 'phase10';
-
-      // Score row
       const scoreCells = this.players.map(p => {
         const entry = roundEntries.find(e => e.playerId === p.id);
         if (!entry) return `<td class="score-table-score">–</td>`;
@@ -175,27 +175,7 @@ export class ActiveMatch {
         <td class="score-table-label">${this.escHtml(this.roundLabel(rn))}</td>
         ${scoreCells}
       </tr>`;
-
-      // Running-total row
-      const totalCells = this.players.map(p => {
-        const entry = roundEntries.find(e => e.playerId === p.id);
-        const prev = runningTotals.get(p.id!) ?? 0;
-        const next = prev + (entry?.value ?? 0);
-        runningTotals.set(p.id!, next);
-        return `<td class="score-table-total">= ${next}</td>`;
-      }).join('');
-
-      rows += `<tr class="score-table-total-row">
-        <td class="score-table-label-total">∑</td>
-        ${totalCells}
-      </tr>`;
     }
-
-    // Final totals footer
-    const footerCells = this.players.map(p => {
-      const ps = this.playerScores.find(s => s.player.id === p.id);
-      return `<td class="score-table-footer">${ps?.total ?? 0}</td>`;
-    }).join('');
 
     return `
       <div class="score-table-wrapper" role="region" aria-label="Score table">
@@ -205,16 +185,14 @@ export class ActiveMatch {
               <th class="score-table-corner">Round</th>
               ${headerCells}
             </tr>
+            <tr class="score-table-totals-row">
+              <td class="score-table-label-total">Total</td>
+              ${totalCells}
+            </tr>
           </thead>
           <tbody>
             ${rows}
           </tbody>
-          <tfoot>
-            <tr class="score-table-totals-row">
-              <td class="score-table-label-total">Total</td>
-              ${footerCells}
-            </tr>
-          </tfoot>
         </table>
       </div>
     `;
@@ -528,8 +506,15 @@ export class ActiveMatch {
               </button>
             </div>
 
+            ${!isCompleted ? `<div class="current-round-banner" aria-label="Current round">
+              <span class="round-banner-label">Now scoring</span>
+              ${this.escHtml(this.roundLabel(this.currentRound))}
+            </div>` : ''}
+
             <section aria-label="Current scores">
-              ${this.tableView ? this.renderScoreTable() : `<div class="score-grid" id="score-grid">${scoreCardsHtml}</div>`}
+              ${this.tableView
+                ? this.renderScoreTable()
+                : `<div class="score-grid" id="score-grid" style="grid-template-columns:repeat(${Math.min(this.playerScores.length, 3)},1fr)">${scoreCardsHtml}</div>`}
             </section>
           </div>
 

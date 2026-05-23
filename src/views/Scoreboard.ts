@@ -132,10 +132,10 @@ export class Scoreboard {
       return `
         <div class="sb-player ${rankClass}" style="--pc:${ps.player.color}">
           <div class="sb-rank-area">${medalHtml}</div>
-          <div class="sb-name-area">
+          <div class="sb-player-body">
             <div class="sb-name">${this._esc(ps.player.displayName)}</div>
+            ${scoreHtml}
           </div>
-          ${scoreHtml}
         </div>`;
     }).join('');
   }

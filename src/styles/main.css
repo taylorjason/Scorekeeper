@@ -1644,6 +1644,9 @@ button, input, select, textarea {
     --sidebar-width: 220px;
   }
 
+  /* FAB is redundant on desktop — sidebar nav has "New Night" */
+  .fab { display: none !important; }
+
   /* ── Side navigation ── */
   .bottom-nav {
     top: 0;

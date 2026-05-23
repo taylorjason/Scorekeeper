@@ -151,7 +151,20 @@ export class ActiveMatch {
       return `<td class="score-table-footer">${ps?.total ?? 0}</td>`;
     }).join('');
 
-    // Round rows — newest at top
+    // Pre-compute cumulative totals per player per round (ascending) for the ∑ rows
+    const ascRoundNums = [...roundNums].sort((a, b) => a - b);
+    const runningTotals = new Map<number, Map<number, number>>(); // roundNum -> playerId -> cumSum
+    const cumulative = new Map<number, number>(this.players.map(p => [p.id!, 0]));
+    for (const rn of ascRoundNums) {
+      const roundEntries = this.entries.filter(e => e.roundNumber === rn);
+      for (const p of this.players) {
+        const val = roundEntries.find(e => e.playerId === p.id)?.value ?? 0;
+        cumulative.set(p.id!, (cumulative.get(p.id!) ?? 0) + val);
+      }
+      runningTotals.set(rn, new Map(cumulative));
+    }
+
+    // Round rows — newest at top, each followed by its cumulative ∑ row
     let rows = '';
     for (const rn of roundNums) {
       const roundEntries = this.entries.filter(e => e.roundNumber === rn);
@@ -171,9 +184,18 @@ export class ActiveMatch {
         return `<td class="score-table-score">${firstOut ? '⚡ ' : ''}${entry.value}</td>`;
       }).join('');
 
+      const runCells = this.players.map(p => {
+        const cum = runningTotals.get(rn)?.get(p.id!) ?? 0;
+        return `<td class="score-table-total">= ${cum}</td>`;
+      }).join('');
+
       rows += `<tr class="score-table-round-row">
         <td class="score-table-label">${this.escHtml(this.roundLabel(rn))}</td>
         ${scoreCells}
+      </tr>
+      <tr class="score-table-total-row">
+        <td class="score-table-label-total">∑</td>
+        ${runCells}
       </tr>`;
     }
 

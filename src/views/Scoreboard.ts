@@ -109,11 +109,10 @@ export class Scoreboard {
       if (isPhase10) {
         const phase = ps.phase ?? 1;
         const done = phase > 10;
+        // Phase 10: 3 rows — name (in player-body), phase, penalty
         scoreHtml = `
-          <div class="sb-score-area">
-            <div class="sb-phase">${done ? '🏆 Done' : `Phase ${phase}`}</div>
-            <div class="sb-penalty">${ps.total} pts</div>
-          </div>`;
+          <div class="sb-phase">${done ? '🏆 Done' : `Phase ${phase}`}</div>
+          <div class="sb-penalty">${ps.total} pts</div>`;
       } else {
         let gapHtml = '';
         if (rank > 0 && this.playerScores.length > 1) {
@@ -122,6 +121,7 @@ export class Scoreboard {
             : this.playerScores[0].total - ps.total;
           if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '-'}${gap}</div>`;
         }
+        // Regular: 2 rows — name, then score + gap on one line
         scoreHtml = `
           <div class="sb-score-area">
             <div class="sb-score">${ps.total}</div>

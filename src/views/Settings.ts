@@ -4,8 +4,13 @@ import {
   exportAll, importAll, db
 } from '../db';
 import { getSyncConfig, saveSyncConfig, testConnection, syncToGitHub, syncFromGitHub, validateSyncConfig } from '../github';
+import {
+  getRoomConfig, saveRoomConfig, clearRoomConfig, generateRoomId,
+  buildShareableUrl, initFirebaseSync, teardownFirebaseSync,
+  isFirebaseSyncActive, pushNow, pullNow,
+} from '../firebase-sync';
 import { showToast } from '../toast';
-import type { Player, Game, SyncConfig } from '../types';
+import type { Player, Game, SyncConfig, FirebaseRoomConfig } from '../types';
 
 const PLAYER_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
@@ -17,6 +22,7 @@ export class Settings {
   private players: Player[] = [];
   private games: Game[] = [];
   private syncConfig: SyncConfig | null = null;
+  private roomConfig: FirebaseRoomConfig | null = null;
   private editingPlayerId: number | null = null;
   private editingGameId: number | null = null;
 
@@ -25,6 +31,7 @@ export class Settings {
     this.players = players;
     this.games = games;
     this.syncConfig = getSyncConfig();
+    this.roomConfig = getRoomConfig();
   }
 
   private escHtml(str: string): string {
@@ -74,10 +81,19 @@ export class Settings {
           </div>
         </section>
 
-        <!-- Sync Section -->
+        <!-- Live Sync Section -->
+        <section class="settings-section" aria-labelledby="live-sync-section-heading">
+          <h2 class="settings-section-title" id="live-sync-section-heading">
+            <span>⚡</span> Live Sync
+            ${isFirebaseSyncActive() ? '<span class="sync-live-badge">● Live</span>' : ''}
+          </h2>
+          ${this.renderFirebaseSection()}
+        </section>
+
+        <!-- Git Sync Section -->
         <section class="settings-section" aria-labelledby="sync-section-heading">
           <h2 class="settings-section-title" id="sync-section-heading">
-            <span>☁️</span> Sync
+            <span>☁️</span> Git Backup
           </h2>
 
           <div class="alert alert-warning mb-3">
@@ -212,6 +228,120 @@ export class Settings {
 
         <div style="height: 1rem"></div>
       </main>
+    `;
+  }
+
+  private renderFirebaseSection(): string {
+    const cfg = this.roomConfig;
+    const active = isFirebaseSyncActive();
+
+    if (cfg && active) {
+      const shareUrl = buildShareableUrl(cfg);
+      return `
+        <div class="card">
+          <div class="toggle-row mb-3">
+            <div>
+              <div class="font-semibold">Room ID</div>
+              <div class="text-sm text-muted font-mono">${this.escHtml(cfg.roomId)}</div>
+            </div>
+            <span class="badge badge-success">Connected</span>
+          </div>
+
+          <div class="text-sm text-muted mb-3">
+            Last sync: <strong id="fb-last-sync">${this.formatTimestamp(cfg.lastSync)}</strong>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Share with friends</label>
+            <div class="input-group">
+              <input class="form-input" type="text" id="fb-share-url"
+                readonly value="${this.escHtml(shareUrl)}" aria-label="Shareable room link" />
+              <button class="btn btn-secondary" id="fb-copy-url-btn" type="button">Copy</button>
+            </div>
+            <span class="form-hint">Anyone who opens this link joins your room automatically.</span>
+          </div>
+
+          <div id="fb-qr-container" class="mb-3" style="text-align:center"></div>
+          <button class="btn btn-secondary btn-full mb-2" id="fb-show-qr-btn" type="button">
+            Show QR Code
+          </button>
+
+          <div class="btn-group mb-2">
+            <button class="btn btn-primary flex-1" id="fb-push-btn" type="button">↑ Push Now</button>
+            <button class="btn btn-secondary flex-1" id="fb-pull-btn" type="button">↓ Pull Now</button>
+          </div>
+          <button class="btn btn-danger btn-full" id="fb-disconnect-btn" type="button">
+            Disconnect
+          </button>
+        </div>
+      `;
+    }
+
+    // Not connected — show setup form
+    const pendingApiKey = cfg?.apiKey ?? '';
+    const pendingProjectId = cfg?.projectId ?? '';
+    const pendingAppId = cfg?.appId ?? '';
+    const pendingRoomId = cfg?.roomId ?? generateRoomId();
+
+    return `
+      <div class="alert alert-info mb-3">
+        <span>ℹ️</span>
+        <span>Real-time sync for your friend group — no login needed. Everyone shares one room.</span>
+      </div>
+
+      <details class="card mb-3" id="fb-setup-instructions">
+        <summary class="font-semibold" style="cursor:pointer;padding:0.5rem 0">
+          How to set up Firebase (one-time, free)
+        </summary>
+        <ol class="text-sm" style="margin:0.75rem 0 0 1.25rem;line-height:1.8">
+          <li>Go to <strong>console.firebase.google.com</strong> → Create a project</li>
+          <li>In the project: <strong>Build → Firestore Database</strong> → Create database → Start in <em>test mode</em></li>
+          <li><strong>Build → Authentication</strong> → Get started → Anonymous → Enable</li>
+          <li><strong>Project Settings</strong> (gear icon) → <em>Your apps</em> → Add app → Web → Register</li>
+          <li>Copy the <code>apiKey</code>, <code>projectId</code>, and <code>appId</code> from the config snippet below</li>
+        </ol>
+        <div class="alert alert-warning mt-2 text-sm">
+          <span>⚠️</span>
+          <span>After setup, go to Firestore → Rules and set: <code>allow read, write: if request.auth != null;</code> to keep your data private to authenticated sessions only.</span>
+        </div>
+      </details>
+
+      <div class="card">
+        <form id="fb-config-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="fb-api-key">API Key</label>
+            <input class="form-input" type="text" id="fb-api-key"
+              placeholder="AIzaSy..." autocomplete="off"
+              value="${this.escHtml(pendingApiKey)}" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="fb-project-id">Project ID</label>
+              <input class="form-input" type="text" id="fb-project-id"
+                placeholder="my-scorekeeper" autocomplete="off"
+                value="${this.escHtml(pendingProjectId)}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="fb-app-id">App ID</label>
+              <input class="form-input" type="text" id="fb-app-id"
+                placeholder="1:123:web:abc" autocomplete="off"
+                value="${this.escHtml(pendingAppId)}" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fb-room-id">Room ID</label>
+            <div class="input-group">
+              <input class="form-input font-mono" type="text" id="fb-room-id"
+                value="${this.escHtml(pendingRoomId)}" autocomplete="off" />
+              <button class="btn btn-secondary" type="button" id="fb-new-room-btn">New</button>
+            </div>
+            <span class="form-hint">A random ID shared with your group. Click New to generate a fresh one.</span>
+          </div>
+          <button class="btn btn-primary btn-full" type="submit" id="fb-connect-btn">
+            Connect &amp; Sync
+          </button>
+        </form>
+      </div>
     `;
   }
 
@@ -364,10 +494,141 @@ export class Settings {
   afterRender(): void {
     this.bindPlayerForm();
     this.bindGameForm();
+    this.bindFirebaseSection();
     this.bindSyncForm();
     this.bindDataButtons();
     this.bindThemeToggle();
     this.bindColorSwatches();
+  }
+
+  private bindFirebaseSection(): void {
+    const cfg = this.roomConfig;
+    const active = isFirebaseSyncActive();
+
+    if (cfg && active) {
+      // ── Connected state bindings ──────────────────────────────────────────
+
+      document.getElementById('fb-copy-url-btn')?.addEventListener('click', () => {
+        const input = document.getElementById('fb-share-url') as HTMLInputElement;
+        navigator.clipboard.writeText(input.value).then(() => {
+          showToast('Link copied!', 'success');
+        }).catch(() => {
+          input.select();
+          document.execCommand('copy');
+          showToast('Link copied!', 'success');
+        });
+      });
+
+      document.getElementById('fb-show-qr-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('fb-show-qr-btn') as HTMLButtonElement;
+        const container = document.getElementById('fb-qr-container');
+        if (!container) return;
+        if (container.innerHTML) { container.innerHTML = ''; btn.textContent = 'Show QR Code'; return; }
+        btn.textContent = 'Generating…';
+        try {
+          const { default: QRCode } = await import('qrcode');
+          const shareUrl = buildShareableUrl(cfg);
+          const svg = await QRCode.toString(shareUrl, { type: 'svg', margin: 1, width: 220 });
+          container.innerHTML = svg;
+          btn.textContent = 'Hide QR Code';
+        } catch (err) {
+          console.error('QR generation failed:', err);
+          btn.textContent = 'Show QR Code';
+          showToast('QR generation failed', 'error');
+        }
+      });
+
+      document.getElementById('fb-push-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('fb-push-btn') as HTMLButtonElement;
+        btn.disabled = true; btn.textContent = 'Pushing…';
+        try {
+          const result = await pushNow();
+          showToast(result.message, result.ok ? 'success' : 'error');
+          if (result.ok) {
+            this.roomConfig = getRoomConfig();
+            const timeEl = document.getElementById('fb-last-sync');
+            if (timeEl) timeEl.textContent = this.formatTimestamp(this.roomConfig?.lastSync);
+          }
+        } finally { btn.disabled = false; btn.textContent = '↑ Push Now'; }
+      });
+
+      document.getElementById('fb-pull-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('fb-pull-btn') as HTMLButtonElement;
+        btn.disabled = true; btn.textContent = 'Pulling…';
+        try {
+          const result = await pullNow();
+          showToast(result.message, result.ok ? 'success' : 'error');
+          if (result.ok) {
+            this.roomConfig = getRoomConfig();
+            const timeEl = document.getElementById('fb-last-sync');
+            if (timeEl) timeEl.textContent = this.formatTimestamp(this.roomConfig?.lastSync);
+          }
+        } finally { btn.disabled = false; btn.textContent = '↓ Pull Now'; }
+      });
+
+      document.getElementById('fb-disconnect-btn')?.addEventListener('click', () => {
+        if (!confirm('Disconnect from live sync? Local data is kept, sync stops.')) return;
+        teardownFirebaseSync();
+        clearRoomConfig();
+        this.roomConfig = null;
+        const container = document.getElementById('view-container');
+        if (container) { container.innerHTML = this.render(); this.afterRender(); }
+        showToast('Disconnected from live sync', 'info');
+      });
+
+      return;
+    }
+
+    // ── Not connected state bindings ──────────────────────────────────────────
+
+    document.getElementById('fb-new-room-btn')?.addEventListener('click', () => {
+      const input = document.getElementById('fb-room-id') as HTMLInputElement;
+      if (input) input.value = generateRoomId();
+    });
+
+    const form = document.getElementById('fb-config-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const apiKey    = (document.getElementById('fb-api-key')     as HTMLInputElement).value.trim();
+      const projectId = (document.getElementById('fb-project-id')  as HTMLInputElement).value.trim();
+      const appId     = (document.getElementById('fb-app-id')      as HTMLInputElement).value.trim();
+      const roomId    = (document.getElementById('fb-room-id')     as HTMLInputElement).value.trim();
+
+      if (!apiKey || !projectId || !appId || !roomId) {
+        showToast('All fields are required', 'error');
+        return;
+      }
+
+      const config: FirebaseRoomConfig = { apiKey, projectId, appId, roomId };
+      saveRoomConfig(config);
+      this.roomConfig = config;
+
+      const btn = document.getElementById('fb-connect-btn') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Connecting…';
+
+      try {
+        const result = await initFirebaseSync(config, () => {
+          // Remote update: reload this settings view
+          const container = document.getElementById('view-container');
+          if (container) { container.innerHTML = this.render(); this.afterRender(); }
+        });
+
+        if (result.ok) {
+          showToast(result.message, 'success');
+          this.roomConfig = getRoomConfig();
+          const container = document.getElementById('view-container');
+          if (container) { container.innerHTML = this.render(); this.afterRender(); }
+        } else {
+          showToast(result.message, 'error');
+          btn.disabled = false; btn.textContent = 'Connect & Sync';
+        }
+      } catch (err) {
+        showToast(`Connection error: ${err instanceof Error ? err.message : String(err)}`, 'error');
+        btn.disabled = false; btn.textContent = 'Connect & Sync';
+      }
+    });
   }
 
   private bindColorSwatches(): void {

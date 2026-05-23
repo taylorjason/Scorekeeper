@@ -1943,9 +1943,9 @@ button, input, select, textarea {
 }
 
 .sb-rank-area { min-width: 3rem; text-align: center; flex-shrink: 0; }
-.sb-medal { font-size: clamp(2.25rem, 5vw, 3.375rem); line-height: 1; }
+.sb-medal { font-size: clamp(2.6rem, 5.75vw, 3.88rem); line-height: 1; }
 .sb-rank-num {
-  font-size: clamp(1.65rem, 3.5vw, 2.25rem);
+  font-size: clamp(1.9rem, 4vw, 2.59rem);
   font-weight: 700;
   color: #475569;
 }
@@ -1959,7 +1959,7 @@ button, input, select, textarea {
 }
 
 .sb-name {
-  font-size: clamp(1.65rem, 4.5vw, 2.625rem);
+  font-size: clamp(1.9rem, 5.2vw, 3.02rem);
   font-weight: 700;
   color: var(--pc, #f1f5f9);
   white-space: nowrap;
@@ -1975,7 +1975,7 @@ button, input, select, textarea {
   gap: 0.4rem;
 }
 .sb-score {
-  font-size: clamp(2.25rem, 6vw, 4.125rem);
+  font-size: clamp(2.48rem, 6.6vw, 4.54rem);
   font-weight: 800;
   color: #f1f5f9;
   font-variant-numeric: tabular-nums;
@@ -1984,25 +1984,25 @@ button, input, select, textarea {
 .sb-gap {
   display: inline-flex;
   align-items: center;
-  background: rgba(148, 163, 184, 0.12);
-  border: 1.5px solid rgba(148, 163, 184, 0.28);
+  background: rgba(226, 232, 240, 0.14);
+  border: 1.5px solid rgba(226, 232, 240, 0.45);
   border-radius: 999px;
-  padding: 0.2rem 0.9rem;
-  font-size: clamp(0.9rem, 1.75vw, 1.25rem);
+  padding: 0.2rem 1rem;
+  font-size: clamp(1.04rem, 2vw, 1.44rem);
   font-weight: 600;
-  color: #94a3b8;
+  color: #e2e8f0;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
 /* Phase 10: phase and penalty are direct rows in sb-player-body */
 .sb-phase {
-  font-size: clamp(1.65rem, 3.75vw, 2.625rem);
+  font-size: clamp(1.9rem, 4.3vw, 3.02rem);
   font-weight: 700;
   color: #51f8e4;
   line-height: 1.1;
 }
 .sb-penalty {
-  font-size: clamp(1.25rem, 2.5vw, 1.875rem);
+  font-size: clamp(1.375rem, 2.75vw, 2.06rem);
   font-weight: 600;
   color: #c0d3ef;
 }

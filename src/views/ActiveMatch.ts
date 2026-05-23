@@ -499,7 +499,7 @@ export class ActiveMatch {
       : '';
 
     return `
-      <main class="view" aria-label="Active Match: ${this.escHtml(this.game.name)}">
+      <main class="view match-view" aria-label="Active Match: ${this.escHtml(this.game.name)}">
         <header style="display:flex; align-items:center; gap:0.75rem; padding-top:1rem; margin-bottom:0.5rem;">
           <button class="btn btn-icon btn-sm" id="back-btn" aria-label="Go back">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -515,22 +515,28 @@ export class ActiveMatch {
 
         ${progressHtml}
 
-        <div class="view-toggle-bar">
-          <button class="view-toggle-btn ${!this.tableView ? 'active' : ''}" id="toggle-cards" aria-pressed="${!this.tableView}" aria-label="Card view">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-            Cards
-          </button>
-          <button class="view-toggle-btn ${this.tableView ? 'active' : ''}" id="toggle-table" aria-pressed="${this.tableView}" aria-label="Table view">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
-            Table
-          </button>
+        <div class="match-body">
+          <div class="match-col-left">
+            <div class="view-toggle-bar">
+              <button class="view-toggle-btn ${!this.tableView ? 'active' : ''}" id="toggle-cards" aria-pressed="${!this.tableView}" aria-label="Card view">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                Cards
+              </button>
+              <button class="view-toggle-btn ${this.tableView ? 'active' : ''}" id="toggle-table" aria-pressed="${this.tableView}" aria-label="Table view">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                Table
+              </button>
+            </div>
+
+            <section aria-label="Current scores">
+              ${this.tableView ? this.renderScoreTable() : `<div class="score-grid" id="score-grid">${scoreCardsHtml}</div>`}
+            </section>
+          </div>
+
+          <div class="match-col-right">
+            ${inputSectionHtml}
+          </div>
         </div>
-
-        <section aria-label="Current scores">
-          ${this.tableView ? this.renderScoreTable() : `<div class="score-grid" id="score-grid">${scoreCardsHtml}</div>`}
-        </section>
-
-        ${inputSectionHtml}
       </main>
     `;
   }

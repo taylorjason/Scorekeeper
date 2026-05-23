@@ -1624,3 +1624,169 @@ button, input, select, textarea {
 
 /* ─── Monospace utility ──────────────────────────────────────────────────────── */
 .font-mono { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.875em; }
+
+/* ─── Sidebar brand (hidden on mobile) ──────────────────────────────────────── */
+.sidebar-brand {
+  display: none;
+}
+
+/* ─── Desktop layout ≥ 900px ─────────────────────────────────────────────────── */
+@media (min-width: 900px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+
+  /* ── Side navigation ── */
+  .bottom-nav {
+    top: 0;
+    bottom: 0;
+    right: auto;
+    width: var(--sidebar-width);
+    height: 100dvh;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    border-radius: 0;
+    max-width: none;
+    transform: none;
+    padding-bottom: 2.5rem; /* room for version footer at bottom */
+    overflow-y: auto;
+  }
+
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 1.25rem 1.25rem 1rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+  }
+  .sidebar-brand-icon { font-size: 1.5rem; line-height: 1; }
+  .sidebar-brand-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  /* Nav items as sidebar rows */
+  .nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 0.7rem 1rem;
+    gap: 0.75rem;
+    border-radius: var(--radius-sm);
+    margin: 2px 0.5rem;
+    min-height: unset;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    width: auto;
+  }
+  .nav-item svg {
+    display: block !important;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .nav-item span,
+  .nav-item--active span {
+    font-size: 0.9375rem !important;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+  .nav-item--active {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--primary) !important;
+  }
+
+  /* ── Version footer inside sidebar ── */
+  .version-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: auto;
+    width: var(--sidebar-width);
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    text-align: left;
+    padding: 0.4rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  /* ── Shift main content right of sidebar ── */
+  .app-header {
+    margin-left: var(--sidebar-width);
+    padding: 0.75rem 2rem;
+  }
+  .app-header .app-logo,
+  .app-header .app-title {
+    display: none; /* branding lives in sidebar-brand instead */
+  }
+  .main-content {
+    margin-left: var(--sidebar-width);
+    padding-bottom: 2rem;
+  }
+
+  /* ── Wider, more padded view ── */
+  .view {
+    max-width: 960px;
+    padding: 2rem 2.5rem;
+  }
+
+  /* ── Larger cards ── */
+  .card {
+    padding: 1.5rem;
+  }
+  .card-title {
+    font-size: 1.125rem;
+  }
+
+  /* ── Larger text throughout ── */
+  .page-title { font-size: 2.25rem; }
+  .form-label { font-size: 0.9375rem; }
+  .form-input,
+  .form-select,
+  .form-textarea { min-height: 44px; font-size: 1rem; }
+  .btn { font-size: 1rem; min-height: 44px; }
+
+  /* ── Score cards ── */
+  .score-card { padding: 1.25rem; }
+  .score-card .score-total { font-size: 2.75rem; }
+  .score-card .player-name { font-size: 1rem; }
+  .player-avatar {
+    width: 52px;
+    height: 52px;
+    font-size: 1.375rem;
+  }
+  .score-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+  }
+
+  /* ── Match two-column layout ── */
+  .match-view {
+    max-width: 1280px;
+  }
+  .match-body {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 2rem;
+    align-items: start;
+    margin-top: 1rem;
+  }
+  .match-col-right {
+    position: sticky;
+    top: 4.5rem; /* clear the sticky app-header */
+  }
+  /* Remove stacked top-margin on the first card in the right column */
+  .match-col-right .card:first-child {
+    margin-top: 0;
+  }
+}

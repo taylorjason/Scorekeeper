@@ -90,8 +90,10 @@ async function doPush(): Promise<void> {
   if (!_roomDocRef || !_currentConfig) return;
   const { setDoc } = await import('firebase/firestore');
   const appData = await exportAll();
+  // Firestore rejects `undefined` field values; JSON roundtrip strips them cleanly.
+  const sanitized = JSON.parse(JSON.stringify(appData));
   await setDoc(_roomDocRef, {
-    appData,
+    appData: sanitized,
     updatedAt: Date.now(),
     updatedByDevice: getDeviceId(),
   });
@@ -173,7 +175,7 @@ export async function initFirebaseSync(
       }
     } else {
       // New room — push local data to seed it
-      const appData = await exportAll();
+      const appData = JSON.parse(JSON.stringify(await exportAll()));
       await setDoc(_roomDocRef, { appData, updatedAt: Date.now(), updatedByDevice: deviceId });
       saveRoomConfig({ ...config, lastSync: Date.now() });
     }

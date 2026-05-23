@@ -4,7 +4,8 @@ export type Route =
   | 'match'
   | 'history'
   | 'stats'
-  | 'settings';
+  | 'settings'
+  | 'scoreboard';
 
 export interface ParsedRoute {
   route: Route;
@@ -35,6 +36,8 @@ export function parseRoute(hash: string): ParsedRoute {
       return { route: 'stats', params: {} };
     case 'settings':
       return { route: 'settings', params: {} };
+    case 'scoreboard':
+      return { route: 'scoreboard', params: { id: parts[1] ?? '' } };
     default:
       return { route: 'dashboard', params: {} };
   }

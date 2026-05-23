@@ -8,7 +8,14 @@ import {
   getRoomConfig, saveRoomConfig, parseRoomFromHash, initFirebaseSync,
 } from './firebase-sync';
 
+let _viewTeardown: (() => void) | null = null;
+
 async function loadView(parsed: ParsedRoute): Promise<void> {
+  _viewTeardown?.();
+  _viewTeardown = null;
+
+  document.body.classList.toggle('scoreboard-mode', parsed.route === 'scoreboard');
+
   const container = document.getElementById('view-container');
   if (!container) return;
 
@@ -62,6 +69,15 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
       await view.load();
       container.innerHTML = view.render();
       view.afterRender();
+      break;
+    }
+    case 'scoreboard': {
+      const { Scoreboard } = await import('./views/Scoreboard');
+      const view = new Scoreboard();
+      await view.load(Number(parsed.params.id));
+      container.innerHTML = view.render();
+      view.afterRender();
+      _viewTeardown = () => view.teardown();
       break;
     }
   }

@@ -159,16 +159,17 @@ export class ActiveMatch {
         const entry = roundEntries.find(e => e.playerId === p.id);
         if (!entry) return `<td class="score-table-score">–</td>`;
         const firstOut = entry.note === 'first_out';
+        const editAttrs = `data-entry-id="${entry.id}" data-player-id="${p.id}" data-round="${rn}"`;
         if (isPhase10) {
           try {
             const data = JSON.parse(entry.note ?? '{}') as { phase?: number; completed?: boolean; firstOut?: boolean };
             const phaseLabel = data.phase ? `Ph.${data.phase}` : '';
             const completedMark = data.completed ? ' ✓' : '';
             const foMark = data.firstOut ? ' ⚡' : '';
-            return `<td class="score-table-score">${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
+            return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
           } catch { /* fall through */ }
         }
-        return `<td class="score-table-score">${firstOut ? '⚡ ' : ''}${entry.value}</td>`;
+        return `<td class="score-table-score score-cell-editable" ${editAttrs}>${firstOut ? '⚡ ' : ''}${entry.value}</td>`;
       }).join('');
 
       rows += `<tr class="score-table-round-row">
@@ -590,6 +591,20 @@ export class ActiveMatch {
       showToast('Game night completed! 🎉', 'success');
     });
 
+    // Editable score cells in the table view
+    document.querySelectorAll<HTMLTableCellElement>('.score-cell-editable').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const entryId = parseInt(cell.dataset.entryId ?? '', 10);
+        const playerId = parseInt(cell.dataset.playerId ?? '', 10);
+        const rn = parseInt(cell.dataset.round ?? '', 10);
+        if (isNaN(entryId)) return;
+        const entry = this.entries.find(e => e.id === entryId);
+        const player = this.players.find(p => p.id === playerId);
+        if (!entry || !player) return;
+        this.showEditModal(entryId, entry.value, player.displayName, this.roundLabel(rn));
+      });
+    });
+
     // Enter key advances to next input in score grid
     document.querySelectorAll<HTMLInputElement>('.score-input').forEach((input, idx, all) => {
       input.addEventListener('keydown', (e) => {
@@ -732,6 +747,61 @@ export class ActiveMatch {
       console.error('Failed to finish match:', err);
       showToast('Failed to finish match', 'error');
     }
+  }
+
+  private showEditModal(entryId: number, currentValue: number, playerName: string, roundLbl: string): void {
+    document.getElementById('score-edit-modal')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'score-edit-modal';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+        <div class="modal-message">
+          <div id="edit-modal-title" style="font-weight:600; margin-bottom:0.75rem">
+            ${this.escHtml(playerName)} — ${this.escHtml(roundLbl)}
+          </div>
+          <input class="form-input" type="number" id="edit-score-input"
+            value="${currentValue}" step="1"
+            style="text-align:center; font-size:1.25rem; width:100%"
+            aria-label="Score value" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
+          <button class="btn btn-primary" id="edit-save-btn">Save</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector<HTMLInputElement>('#edit-score-input')!;
+    input.focus();
+    input.select();
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#edit-cancel-btn')?.addEventListener('click', close);
+
+    const save = async () => {
+      const newValue = parseFloat(input.value);
+      if (isNaN(newValue)) { showToast('Invalid score', 'error'); return; }
+      try {
+        await db.scoreEntries.update(entryId, { value: newValue });
+        close();
+        showToast('Score updated', 'success');
+        await this.load(this.matchId);
+        this.reRender();
+      } catch (err) {
+        console.error('Failed to update score:', err);
+        showToast('Failed to update score', 'error');
+      }
+    };
+
+    overlay.querySelector('#edit-save-btn')?.addEventListener('click', save);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      if (e.key === 'Escape') close();
+    });
   }
 
   private reRender(): void {

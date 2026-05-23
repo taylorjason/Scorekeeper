@@ -132,9 +132,6 @@ export class Scoreboard {
       return `
         <div class="sb-player ${rankClass}" style="--pc:${ps.player.color}">
           <div class="sb-rank-area">${medalHtml}</div>
-          <div class="sb-avatar" style="background:${ps.player.color}">
-            ${ps.player.displayName.charAt(0).toUpperCase()}
-          </div>
           <div class="sb-name-area">
             <div class="sb-name">${this._esc(ps.player.displayName)}</div>
           </div>

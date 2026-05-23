@@ -619,6 +619,13 @@ button, input, select, textarea {
   font-weight: 600;
   border-bottom: 1px dashed var(--border);
 }
+.score-cell-editable {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.score-cell-editable:hover {
+  background: rgba(99, 102, 241, 0.12) !important;
+}
 .score-table-total {
   padding: 0.3rem 0.5rem;
   text-align: center;
@@ -1828,6 +1835,7 @@ button, input, select, textarea {
   padding-bottom: 0;
   padding-top: 0;
   max-width: 100%;
+  margin-left: 0 !important;
 }
 
 /* ─── Scoreboard View ────────────────────────────────────────────────────────── */
@@ -1920,13 +1928,14 @@ button, input, select, textarea {
 }
 
 .sb-player {
-  background: #111827;
+  background: linear-gradient(to right, color-mix(in srgb, var(--pc, #6366f1) 10%, #111827) 0%, #111827 45%);
   border-radius: 14px;
   padding: clamp(0.9rem, 2vw, 1.5rem) clamp(1rem, 2.5vw, 1.75rem);
   display: flex;
   align-items: center;
   gap: clamp(0.75rem, 2vw, 1.25rem);
-  border-left: 4px solid var(--pc, #6366f1);
+  border-left: 5px solid var(--pc, #6366f1);
+  box-shadow: -2px 0 18px color-mix(in srgb, var(--pc, #6366f1) 25%, transparent);
   transition: transform 0.3s ease;
 }
 
@@ -1938,27 +1947,13 @@ button, input, select, textarea {
   color: #475569;
 }
 
-.sb-avatar {
-  width: clamp(2.5rem, 5vw, 3.5rem);
-  height: clamp(2.5rem, 5vw, 3.5rem);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(1rem, 2.5vw, 1.5rem);
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-}
-
 .sb-name-area { flex: 1; min-width: 0; }
 .sb-name {
   font-size: clamp(1.1rem, 3vw, 1.75rem);
-  font-weight: 600;
-  color: #f1f5f9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 700;
+  color: var(--pc, #f1f5f9);
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 .sb-score-area { flex-shrink: 0; text-align: right; }
@@ -1989,10 +1984,10 @@ button, input, select, textarea {
 
 /* 1st place emphasis */
 .sb-player.sb-rank-1 {
-  background: linear-gradient(135deg, #15192e 0%, #111827 100%);
+  background: linear-gradient(to right, color-mix(in srgb, var(--pc, #6366f1) 18%, #111827) 0%, #111827 50%);
 }
 .sb-player.sb-rank-1 .sb-score { color: #fbbf24; }
-.sb-player.sb-rank-1 .sb-name { color: #fff; }
+.sb-player.sb-rank-1 .sb-name { color: var(--pc, #f1f5f9); filter: brightness(1.2); }
 
 /* Landscape / tablet: 2-column grid */
 @media (min-width: 640px) and (orientation: landscape) {

@@ -108,6 +108,10 @@ function renderAppShell(): void {
     </footer>
 
     <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
+      <div class="sidebar-brand" aria-hidden="true">
+        <span class="sidebar-brand-icon">🎲</span>
+        <span class="sidebar-brand-name">Scorekeeper</span>
+      </div>
       <button class="nav-item" data-route="dashboard" aria-label="Dashboard">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>

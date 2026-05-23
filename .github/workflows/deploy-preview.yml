@@ -1,15 +1,15 @@
-name: Build & Deploy to GitHub Pages
+name: Deploy Preview to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [claude/**]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: pages-prod
+  group: pages-preview
   cancel-in-progress: true
 
 jobs:
@@ -32,9 +32,10 @@ jobs:
         env:
           BUILD_NUMBER: ${{ github.run_number }}
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to dev-env subdirectory
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
+          destination_dir: dev-env
           keep_files: true

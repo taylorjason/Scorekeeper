@@ -1,0 +1,265 @@
+import{A as e,E as t,F as n,M as r,S as i,f as a,k as o,m as s,p as c,y as l}from"./index-Dm95kI9L.js";var u=class{matchId=0;match=null;game=null;night=null;players=[];entries=[];playerScores=[];currentRound=1;nightMatches=[];tableView=!1;roundLabel(e){let t=this.game?.roundLabels;return t&&t.length>=e?t[e-1]:`Round ${e}`}async load(n){if(this.matchId=n,this.match=await o(n)??null,!this.match)return;let[i,a,s,c,u]=await Promise.all([l.games.get(this.match.gameId),t(this.match.gameNightId),l.players.where(`id`).anyOf(this.match.playerIds).toArray(),r(n),e(this.match.gameNightId)]);this.game=i??null,this.night=a??null,this.entries=c,this.nightMatches=u,this.players=this.match.playerIds.map(e=>s.find(t=>t.id===e)).filter(e=>e!==void 0),this.computeScores(),this.currentRound=this.entries.length>0?Math.max(...this.entries.map(e=>e.roundNumber))+1:1}getPlayerCurrentPhase(e){let t=this.entries.filter(t=>t.playerId===e.id).sort((e,t)=>e.roundNumber-t.roundNumber),n=1;for(let e of t)if(e.note)try{let t=JSON.parse(e.note);t.completed&&t.phase===n&&(n=Math.min(n+1,11))}catch{}return n}computeScores(){this.playerScores=this.players.map(e=>{let t=this.entries.filter(t=>t.playerId===e.id);return{player:e,total:t.reduce((e,t)=>e+t.value,0),entries:t}});let e=this.game?.scoringMode;e===`low`||e===`phase10`?e===`phase10`?this.playerScores.sort((e,t)=>{let n=this.getPlayerCurrentPhase(e.player),r=this.getPlayerCurrentPhase(t.player);return r===n?e.total-t.total:r-n}):this.playerScores.sort((e,t)=>e.total-t.total):this.playerScores.sort((e,t)=>t.total-e.total)}rankIcon(e){return e===0?`🥇`:e===1?`🥈`:e===2?`🥉`:``}rankClass(e){return e===0?`rank-1-card`:e===1?`rank-2-card`:e===2?`rank-3-card`:``}escHtml(e){return e.replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`)}renderScoreTable(){if(this.players.length===0||this.entries.length===0)return`<div class="text-sm text-muted" style="padding:1rem 0; text-align:center">No scores yet — add a round to see the table.</div>`;let e=[...new Set(this.entries.map(e=>e.roundNumber))].sort((e,t)=>e-t),t=new Map;for(let e of this.players)t.set(e.id,0);let n=this.players.map(e=>`<th style="background:${e.color}22; border-bottom: 2px solid ${e.color}">
+        <div class="flex items-center gap-1 justify-center">
+          <span class="player-dot" style="background:${e.color}; flex-shrink:0"></span>
+          <span>${this.escHtml(e.displayName)}</span>
+        </div>
+      </th>`).join(``),r=``;for(let n of e){let e=this.entries.filter(e=>e.roundNumber===n),i=this.game?.scoringMode===`phase10`,a=this.players.map(t=>{let n=e.find(e=>e.playerId===t.id);if(!n)return`<td class="score-table-score">–</td>`;let r=n.note===`first_out`;if(i)try{let e=JSON.parse(n.note??`{}`);return`<td class="score-table-score">${e.phase?`Ph.${e.phase}`:``}${e.completed?` ✓`:``}${e.firstOut?` ⚡`:``}<br><small>${n.value}pts</small></td>`}catch{}return`<td class="score-table-score">${r?`⚡ `:``}${n.value}</td>`}).join(``);r+=`<tr class="score-table-round-row">
+        <td class="score-table-label">${this.escHtml(this.roundLabel(n))}</td>
+        ${a}
+      </tr>`;let o=this.players.map(n=>{let r=e.find(e=>e.playerId===n.id),i=(t.get(n.id)??0)+(r?.value??0);return t.set(n.id,i),`<td class="score-table-total">= ${i}</td>`}).join(``);r+=`<tr class="score-table-total-row">
+        <td class="score-table-label-total">∑</td>
+        ${o}
+      </tr>`}let i=this.players.map(e=>`<td class="score-table-footer">${this.playerScores.find(t=>t.player.id===e.id)?.total??0}</td>`).join(``);return`
+      <div class="score-table-wrapper" role="region" aria-label="Score table">
+        <table class="score-table" aria-label="Scores by round">
+          <thead>
+            <tr>
+              <th class="score-table-corner">Round</th>
+              ${n}
+            </tr>
+          </thead>
+          <tbody>
+            ${r}
+          </tbody>
+          <tfoot>
+            <tr class="score-table-totals-row">
+              <td class="score-table-label-total">Total</td>
+              ${i}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `}render(){if(!this.match||!this.game||!this.night)return`
+        <main class="view" aria-label="Match not found">
+          <div class="empty-state">
+            <div class="empty-state-icon">🔍</div>
+            <div class="empty-state-title">Match not found</div>
+            <p>This match may have been deleted.</p>
+            <button class="btn btn-primary mt-4" id="back-to-dashboard">Back to Dashboard</button>
+          </div>
+        </main>
+      `;let e=this.match.status===`completed`,t=this.game.scoringMode,n=this.nightMatches.findIndex(e=>e.id===this.matchId),r=this.nightMatches[n+1],i=this.nightMatches.every(e=>e.status===`completed`||e.id===this.matchId),a=t===`phase10`,o=this.playerScores.map((e,t)=>{if(a){let n=this.getPlayerCurrentPhase(e.player),r=n>10;return`
+          <div class="score-card ${this.rankClass(t)}" aria-label="${this.escHtml(e.player.displayName)}: Phase ${r?`10 done`:n}, ${e.total} pts">
+            ${t<3?`<span class="score-rank" aria-hidden="true">${this.rankIcon(t)}</span>`:``}
+            <div class="player-avatar" style="background:${e.player.color}">
+              ${e.player.displayName.charAt(0).toUpperCase()}
+            </div>
+            <div class="player-name">${this.escHtml(e.player.displayName)}</div>
+            <div class="score-total" style="font-size:1.1rem">${r?`🏆 Done`:`Ph.${n}`}</div>
+            <div class="text-xs text-muted">${e.total} penalty pts</div>
+          </div>
+        `}return`
+        <div class="score-card ${this.rankClass(t)}" aria-label="${this.escHtml(e.player.displayName)}: ${e.total} points">
+          ${t<3?`<span class="score-rank" aria-hidden="true">${this.rankIcon(t)}</span>`:``}
+          <div class="player-avatar" style="background:${e.player.color}">
+            ${e.player.displayName.charAt(0).toUpperCase()}
+          </div>
+          <div class="player-name">${this.escHtml(e.player.displayName)}</div>
+          <div class="score-total" aria-label="${e.total} points">${e.total}</div>
+        </div>
+      `}).join(``),s=`
+      <div class="form-group" style="margin-top:0.75rem">
+        <label class="form-label" for="first-out-select" style="font-size:0.8rem">Who went out first? <span class="text-muted">(optional)</span></label>
+        <select class="form-select" id="first-out-select" style="min-height:38px">
+          <option value="">— none / unknown —</option>
+          ${this.players.map(e=>`<option value="${e.id}">${this.escHtml(e.displayName)}</option>`).join(``)}
+        </select>
+      </div>
+    `,c=``;if(e){let e=this.playerScores[0],t=r?`<button class="btn btn-primary btn-full mt-4" id="next-match-btn" aria-label="Go to next match">▶ Next Match</button>`:i?`<button class="btn btn-success btn-full mt-4" id="finish-night-btn" aria-label="Finish the game night">🎉 Finish Night</button>`:``;c=`
+        <div class="card mt-4" style="text-align:center; padding:2rem 1rem;">
+          <div style="font-size:3rem; margin-bottom:0.5rem">🏆</div>
+          <div class="font-bold" style="font-size:1.25rem">${e?this.escHtml(e.player.displayName):`Draw`} wins!</div>
+          <div class="text-muted text-sm mt-4">Final score: ${e?.total??0}</div>
+          ${t}
+          <button class="btn btn-secondary btn-full mt-4" id="back-to-night-btn">Back to Dashboard</button>
+        </div>
+      `}else{if(t===`phase10`){let e=this.players.map(e=>{let t=this.getPlayerCurrentPhase(e);return t>10?`
+              <div class="phase10-player-row" style="opacity:0.6">
+                <div class="flex items-center gap-2">
+                  <span class="player-dot" style="background:${e.color}"></span>
+                  <span class="font-semibold">${this.escHtml(e.displayName)}</span>
+                  <span class="phase10-badge phase10-done">All phases done 🏆</span>
+                </div>
+              </div>
+            `:`
+            <div class="phase10-player-row">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="player-dot" style="background:${e.color}"></span>
+                <span class="font-semibold">${this.escHtml(e.displayName)}</span>
+                <span class="phase10-badge">Phase ${t}</span>
+              </div>
+              <div class="flex items-center gap-3 flex-wrap">
+                <div style="display:flex; flex-direction:column; align-items:center; gap:2px">
+                  <span class="text-xs text-muted">Penalty pts</span>
+                  <input class="score-input" type="number" id="score-input-${e.id}" data-player-id="${e.id}"
+                    placeholder="0" min="0" step="5" style="max-width:80px; text-align:center"
+                    aria-label="${this.escHtml(e.displayName)} penalty points" />
+                </div>
+                <label class="flex items-center gap-2" style="cursor:pointer; padding: 4px 0">
+                  <input type="checkbox" id="completed-${e.id}" style="width:18px; height:18px">
+                  <span class="text-sm">Completed Phase ${t}</span>
+                </label>
+              </div>
+            </div>
+          `}).join(``);c=`
+          <div class="card mt-4">
+            <div class="card-header">
+              <div class="card-title">Round ${this.currentRound}</div>
+              <span class="round-badge">Phase 10</span>
+            </div>
+            ${e}
+            ${s}
+            <div class="btn-group mt-3">
+              <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Save round">
+                ✓ Save Round
+              </button>
+              <button class="btn btn-secondary" id="undo-btn" ${this.entries.length===0?`disabled`:``} aria-label="Undo last round">
+                ↩ Undo
+              </button>
+            </div>
+          </div>
+        `}else if(t===`rounds`){let e=this.players.map(e=>`
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <div class="flex items-center gap-1">
+              <span class="player-dot" style="background:${e.color}"></span>
+              <span class="text-xs font-semibold">${this.escHtml(e.displayName)}</span>
+            </div>
+            <input
+              class="score-input"
+              type="number"
+              id="score-input-${e.id}"
+              data-player-id="${e.id}"
+              placeholder="0"
+              aria-label="${this.escHtml(e.displayName)} score"
+              step="1"
+              style="max-width: 90px;"
+            />
+          </div>
+        `).join(``);c=`
+          <div class="card mt-4">
+            <div class="card-header">
+              <div class="card-title">${this.roundLabel(this.currentRound)}</div>
+              <span class="round-badge">🎯 ${this.roundLabel(this.currentRound)}</span>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:0.75rem; justify-content:center; margin-bottom:0.5rem;">
+              ${e}
+            </div>
+            ${s}
+            <div class="btn-group mt-2">
+              <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Save round scores">
+                ✓ Add Round
+              </button>
+              <button class="btn btn-secondary" id="undo-btn" ${this.entries.length===0?`disabled`:``} aria-label="Undo last round">
+                ↩ Undo
+              </button>
+            </div>
+          </div>
+        `}else if(t===`finish-order`)c=`
+          <div class="card mt-4">
+            <div class="card-header">
+              <div class="card-title">Final Positions</div>
+            </div>
+            ${this.players.map(e=>`
+          <div class="flex items-center gap-3 mb-2">
+            <span class="player-dot player-dot-lg" style="background:${e.color}"></span>
+            <span class="font-semibold flex-1">${this.escHtml(e.displayName)}</span>
+            <select class="form-select" style="max-width:120px; min-height:42px"
+              id="order-input-${e.id}" data-player-id="${e.id}" aria-label="${this.escHtml(e.displayName)} position">
+              <option value="">Place</option>
+              ${this.players.map((e,t)=>`<option value="${t+1}">${t+1}${[`st`,`nd`,`rd`][t]||`th`}</option>`).join(``)}
+            </select>
+          </div>
+        `).join(``)}
+            <div class="btn-group mt-4">
+              <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Save finish order">
+                ✓ Save Positions
+              </button>
+              <button class="btn btn-secondary" id="undo-btn" ${this.entries.length===0?`disabled`:``} aria-label="Undo">
+                ↩ Undo
+              </button>
+            </div>
+          </div>
+        `;else{let e=this.players.map(e=>{let t=this.playerScores.find(t=>t.player.id===e.id)?.total??0;return`
+            <div class="flex items-center gap-3 mb-2">
+              <span class="player-dot player-dot-lg" style="background:${e.color}"></span>
+              <span class="font-semibold flex-1">${this.escHtml(e.displayName)}</span>
+              <span class="text-sm text-muted" style="min-width:40px; text-align:right">=${t}</span>
+              <input
+                class="score-input"
+                type="number"
+                id="score-input-${e.id}"
+                data-player-id="${e.id}"
+                placeholder="+0"
+                step="1"
+                style="max-width: 90px; text-align:center"
+                aria-label="${this.escHtml(e.displayName)} score to add"
+              />
+            </div>
+          `}).join(``);c=`
+          <div class="card mt-4">
+            <div class="card-header">
+              <div class="card-title">${t===`low`?`Add Scores (lower is better)`:`Add Scores`}</div>
+              <span class="round-badge">${this.roundLabel(this.currentRound)}</span>
+            </div>
+            <div style="margin-bottom:0.5rem">
+              ${e}
+            </div>
+            ${s}
+            <div class="btn-group mt-2">
+              <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Add scores">
+                ✓ Add Scores
+              </button>
+              <button class="btn btn-secondary" id="undo-btn" ${this.entries.length===0?`disabled`:``} aria-label="Undo last round">
+                ↩ Undo
+              </button>
+            </div>
+          </div>
+        `}c+=e?``:`
+        <div class="btn-group mt-4">
+          <button class="btn btn-success flex-1" id="finish-match-btn" aria-label="Finish this match">
+            🏁 Finish Match
+          </button>
+        </div>
+      `}let l=this.nightMatches.length>1?`<div class="flex gap-2 items-center justify-center mb-3">
+          ${this.nightMatches.map(e=>{let t=e.id===this.matchId,n=e.status===`completed`;return`<div style="width:8px; height:8px; border-radius:50%; background:${t?`var(--primary)`:n?`var(--success)`:`var(--border)`}"></div>`}).join(``)}
+        </div>`:``;return`
+      <main class="view match-view" aria-label="Active Match: ${this.escHtml(this.game.name)}">
+        <header style="display:flex; align-items:center; gap:0.75rem; padding-top:1rem; margin-bottom:0.5rem;">
+          <button class="btn btn-icon btn-sm" id="back-btn" aria-label="Go back">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <div class="match-header flex-1">
+            <div class="match-game-name">${this.escHtml(this.game.name)}</div>
+            <div class="match-night-name">${this.escHtml(this.night.title)}</div>
+          </div>
+          ${e?`<span class="badge badge-success">Done</span>`:`<span class="badge badge-primary">Live</span>`}
+        </header>
+
+        ${l}
+
+        <div class="match-body">
+          <div class="match-col-left">
+            <div class="view-toggle-bar">
+              <button class="view-toggle-btn ${this.tableView?``:`active`}" id="toggle-cards" aria-pressed="${!this.tableView}" aria-label="Card view">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                Cards
+              </button>
+              <button class="view-toggle-btn ${this.tableView?`active`:``}" id="toggle-table" aria-pressed="${this.tableView}" aria-label="Table view">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                Table
+              </button>
+            </div>
+
+            <section aria-label="Current scores">
+              ${this.tableView?this.renderScoreTable():`<div class="score-grid" id="score-grid">${o}</div>`}
+            </section>
+          </div>
+
+          <div class="match-col-right">
+            ${c}
+          </div>
+        </div>
+      </main>
+    `}afterRender(){document.getElementById(`toggle-cards`)?.addEventListener(`click`,()=>{this.tableView=!1,this.reRender()}),document.getElementById(`toggle-table`)?.addEventListener(`click`,()=>{this.tableView=!0,this.reRender()}),document.getElementById(`back-to-dashboard`)?.addEventListener(`click`,()=>c(`dashboard`)),document.getElementById(`back-btn`)?.addEventListener(`click`,()=>c(`dashboard`)),document.getElementById(`back-to-night-btn`)?.addEventListener(`click`,()=>c(`dashboard`)),document.getElementById(`add-round-btn`)?.addEventListener(`click`,()=>{this.handleAddRound()}),document.getElementById(`undo-btn`)?.addEventListener(`click`,()=>{this.handleUndo()}),document.getElementById(`finish-match-btn`)?.addEventListener(`click`,()=>{this.handleFinishMatch()}),document.getElementById(`next-match-btn`)?.addEventListener(`click`,()=>{let e=this.nightMatches.findIndex(e=>e.id===this.matchId),t=this.nightMatches[e+1];t?.id!==void 0&&c(`match`,{id:String(t.id)})}),document.getElementById(`finish-night-btn`)?.addEventListener(`click`,()=>{c(`dashboard`),a(`Game night completed! 🎉`,`success`)}),document.querySelectorAll(`.score-input`).forEach((e,t,n)=>{e.addEventListener(`keydown`,e=>{if(e.key===`Enter`){e.preventDefault();let r=n[t+1];r?r.focus():document.getElementById(`add-round-btn`)?.click()}})})}async handleAddRound(){if(!this.match||!this.game)return;let e=this.game.scoringMode,t=[];if(e===`phase10`){let e=document.getElementById(`first-out-select`)?.value??``;for(let n of this.players){let r=this.getPlayerCurrentPhase(n);if(r>10)continue;let i=document.getElementById(`score-input-${n.id}`),a=parseFloat(i?.value??`0`)||0,o=document.getElementById(`completed-${n.id}`)?.checked??!1,s=e===String(n.id),c=JSON.stringify({phase:r,completed:o,...s?{firstOut:!0}:{}});t.push({playerId:n.id,value:a,note:c})}if(t.length===0){a(`All players have completed all phases`,`info`);return}}else if(e===`finish-order`){let e=new Set;for(let n of this.players){let r=document.getElementById(`order-input-${n.id}`),i=parseInt(r?.value??``,10);if(!i||isNaN(i)){a(`Set position for ${n.displayName}`,`error`);return}if(e.has(i)){a(`Each player must have a unique position`,`error`);return}e.add(i);let o=this.players.length-i+1;t.push({playerId:n.id,value:o})}}else{let e=document.getElementById(`first-out-select`)?.value??``;for(let n of this.players){let r=document.getElementById(`score-input-${n.id}`),i=parseFloat(r?.value??`0`)||0,a=e===String(n.id);t.push({playerId:n.id,value:i,...a?{note:`first_out`}:{}})}}let n=Date.now();try{for(let e of t)await s({matchId:this.matchId,playerId:e.playerId,roundNumber:this.currentRound,value:e.value,...e.note===void 0?{}:{note:e.note},createdAt:n});if(a(`${this.roundLabel(this.currentRound)} saved`,`success`),await this.load(this.matchId),e===`phase10`&&this.players.some(e=>this.getPlayerCurrentPhase(e)>10)){await this.handleFinishMatch();return}this.reRender()}catch(e){console.error(`Failed to save scores:`,e),a(`Failed to save scores`,`error`)}}async handleUndo(){if(!this.match)return;let e=this.currentRound-1;if(!(e<1))try{await i(this.matchId)&&(a(`Removed ${this.roundLabel(e)}`,`info`),await this.load(this.matchId),this.reRender())}catch(e){console.error(`Failed to undo:`,e),a(`Failed to undo`,`error`)}}async handleFinishMatch(){if(!this.match||!this.game)return;if(this.playerScores.length===0){a(`Add at least one round before finishing`,`error`);return}let e=this.playerScores[0],t=e?.player.id;try{await n(this.matchId,{status:`completed`,winnerId:t}),a(`${e?.player.displayName??`Player`} wins! 🏆`,`success`),await this.load(this.matchId),this.reRender()}catch(e){console.error(`Failed to finish match:`,e),a(`Failed to finish match`,`error`)}}reRender(){let e=document.getElementById(`view-container`);e&&(e.innerHTML=this.render(),this.afterRender())}};export{u as ActiveMatch};

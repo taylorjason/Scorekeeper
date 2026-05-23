@@ -1,0 +1,1 @@
+import{d as e,f as t,p as n,u as r}from"./index.esm-BNankVm5.js";n(`firebase`,`12.13.0`,`app`);export{r as getApp,e as getApps,t as initializeApp};

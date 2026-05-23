@@ -4,6 +4,9 @@ import { initRouter, onRouteChange, getCurrentRoute, navigate } from './router';
 import type { ParsedRoute } from './router';
 export { showToast } from './toast';
 import { showToast } from './toast';
+import {
+  getRoomConfig, saveRoomConfig, parseRoomFromHash, initFirebaseSync,
+} from './firebase-sync';
 
 async function loadView(parsed: ParsedRoute): Promise<void> {
   const container = document.getElementById('view-container');
@@ -166,10 +169,34 @@ async function init(): Promise<void> {
   const savedTheme = localStorage.getItem('scorekeeper_theme') ?? 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
 
+  // Check for room join link in URL hash — auto-import the config
+  const hashRoom = parseRoomFromHash();
+  if (hashRoom) {
+    saveRoomConfig(hashRoom);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    showToast('Room config imported — connecting…', 'info');
+  }
+
   // Render the shell immediately so the user never stares at a spinner
   renderAppShell();
   initRouter();
   onRouteChange(loadView);
+
+  // Start Firebase real-time sync if a room is configured
+  const roomConfig = getRoomConfig();
+  if (roomConfig) {
+    initFirebaseSync(roomConfig, () => {
+      const current = getCurrentRoute();
+      // Don't interrupt active match scoring; just show a toast
+      if (current.route === 'match') {
+        showToast('Scores updated by another device', 'info');
+      } else {
+        loadView(current).catch(() => {/* non-fatal */});
+      }
+    }).then(result => {
+      if (!result.ok) console.warn('[Firebase] Sync init failed:', result.message);
+    }).catch(err => console.warn('[Firebase] Sync init error:', err));
+  }
 
   // Seed demo data in the background — non-fatal if it fails or is slow
   seedDemoData().catch(err => console.warn('[Demo] Seed failed (non-fatal):', err));

@@ -24,6 +24,10 @@ export class ScorekeeperDB extends Dexie {
 
 export const db = new ScorekeeperDB();
 
+function notifyChange(): void {
+  window.dispatchEvent(new CustomEvent('scorekeeper:datachanged'));
+}
+
 // ─── Players ────────────────────────────────────────────────────────────────
 
 export async function getPlayers(): Promise<Player[]> {
@@ -36,15 +40,19 @@ export async function getActivePlayers(): Promise<Player[]> {
 }
 
 export async function createPlayer(data: Omit<Player, 'id'>): Promise<number> {
-  return db.players.add(data);
+  const id = await db.players.add(data);
+  notifyChange();
+  return id;
 }
 
 export async function updatePlayer(id: number, changes: Partial<Player>): Promise<void> {
   await db.players.update(id, changes);
+  notifyChange();
 }
 
 export async function deletePlayer(id: number): Promise<void> {
   await db.players.delete(id);
+  notifyChange();
 }
 
 // ─── Games ──────────────────────────────────────────────────────────────────
@@ -54,25 +62,32 @@ export async function getGames(): Promise<Game[]> {
 }
 
 export async function createGame(data: Omit<Game, 'id'>): Promise<number> {
-  return db.games.add(data);
+  const id = await db.games.add(data);
+  notifyChange();
+  return id;
 }
 
 export async function updateGame(id: number, changes: Partial<Game>): Promise<void> {
   await db.games.update(id, changes);
+  notifyChange();
 }
 
 export async function deleteGame(id: number): Promise<void> {
   await db.games.delete(id);
+  notifyChange();
 }
 
 // ─── Game Nights ─────────────────────────────────────────────────────────────
 
 export async function createGameNight(data: Omit<GameNight, 'id'>): Promise<number> {
-  return db.gameNights.add(data);
+  const id = await db.gameNights.add(data);
+  notifyChange();
+  return id;
 }
 
 export async function updateGameNight(id: number, changes: Partial<GameNight>): Promise<void> {
   await db.gameNights.update(id, changes);
+  notifyChange();
 }
 
 export async function getGameNights(): Promise<GameNight[]> {
@@ -93,16 +108,20 @@ export async function deleteGameNight(id: number): Promise<void> {
   }
   await db.matches.where('gameNightId').equals(id).delete();
   await db.gameNights.delete(id);
+  notifyChange();
 }
 
 // ─── Matches ─────────────────────────────────────────────────────────────────
 
 export async function createMatch(data: Omit<Match, 'id'>): Promise<number> {
-  return db.matches.add(data);
+  const id = await db.matches.add(data);
+  notifyChange();
+  return id;
 }
 
 export async function updateMatch(id: number, changes: Partial<Match>): Promise<void> {
   await db.matches.update(id, changes);
+  notifyChange();
 }
 
 export async function getMatch(id: number): Promise<Match | undefined> {
@@ -120,7 +139,9 @@ export async function getActiveMatch(): Promise<Match | undefined> {
 // ─── Score Entries ────────────────────────────────────────────────────────────
 
 export async function addScoreEntry(data: Omit<ScoreEntry, 'id'>): Promise<number> {
-  return db.scoreEntries.add(data);
+  const id = await db.scoreEntries.add(data);
+  notifyChange();
+  return id;
 }
 
 export async function getScoreEntriesForMatch(matchId: number): Promise<ScoreEntry[]> {
@@ -144,6 +165,7 @@ export async function deleteLastScoreEntry(matchId: number): Promise<boolean> {
       await db.scoreEntries.delete(entry.id);
     }
   }
+  notifyChange();
   return true;
 }
 
@@ -287,7 +309,7 @@ export async function exportAll(): Promise<AppData> {
   };
 }
 
-export async function importAll(data: AppData): Promise<void> {
+export async function importAll(data: AppData, skipEvent = false): Promise<void> {
   await db.transaction('rw', [
     db.players,
     db.games,
@@ -307,4 +329,5 @@ export async function importAll(data: AppData): Promise<void> {
     if (data.matches?.length) await db.matches.bulkAdd(data.matches);
     if (data.scoreEntries?.length) await db.scoreEntries.bulkAdd(data.scoreEntries);
   });
+  if (!skipEvent) notifyChange();
 }

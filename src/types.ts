@@ -63,6 +63,15 @@ export interface StatSnapshot {
   lastPlayed: number; // timestamp
 }
 
+// FirebaseRoomConfig for real-time Firestore sync
+export interface FirebaseRoomConfig {
+  apiKey: string;
+  projectId: string;
+  appId: string;
+  roomId: string;
+  lastSync?: number;
+}
+
 // SyncConfig for GitHub / Gitea API integration
 export interface SyncConfig {
   provider: 'github' | 'gitea'; // which forge to sync with

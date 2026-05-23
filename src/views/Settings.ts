@@ -711,6 +711,8 @@ export class Settings {
     if (!old) return;
     const form = old.cloneNode(true) as HTMLElement;
     old.replaceWith(form);
+    // cloneNode does not copy event listeners — re-bind color swatches on the new node.
+    this.bindColorSwatches();
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const nameInput = document.getElementById('player-name') as HTMLInputElement;

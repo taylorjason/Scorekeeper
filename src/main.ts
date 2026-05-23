@@ -182,24 +182,28 @@ async function init(): Promise<void> {
   initRouter();
   onRouteChange(loadView);
 
-  // Start Firebase real-time sync if a room is configured
+  // Start Firebase real-time sync if a room is configured.
+  // Await it so the initial view renders with remote data, not stale local data.
+  // This also prevents the demo-seed race: if Firebase populates the DB first,
+  // seedDemoData will correctly find players > 0 and skip.
   const roomConfig = getRoomConfig();
   if (roomConfig) {
-    initFirebaseSync(roomConfig, () => {
+    const onRemoteUpdate = () => {
       const current = getCurrentRoute();
-      // Don't interrupt active match scoring; just show a toast
       if (current.route === 'match') {
         showToast('Scores updated by another device', 'info');
       } else {
         loadView(current).catch(() => {/* non-fatal */});
       }
-    }).then(result => {
-      if (!result.ok) console.warn('[Firebase] Sync init failed:', result.message);
-    }).catch(err => console.warn('[Firebase] Sync init error:', err));
+    };
+    const result = await initFirebaseSync(roomConfig, onRemoteUpdate);
+    if (!result.ok) console.warn('[Firebase] Sync init failed:', result.message);
+  } else {
+    // Only seed demo data when there is no live sync configured.
+    // If Firebase is active, seeding would race with the initial pull and
+    // could push demo players/games into the shared room.
+    seedDemoData().catch(err => console.warn('[Demo] Seed failed (non-fatal):', err));
   }
-
-  // Seed demo data in the background — non-fatal if it fails or is slow
-  seedDemoData().catch(err => console.warn('[Demo] Seed failed (non-fatal):', err));
 
   await loadView(getCurrentRoute());
 }

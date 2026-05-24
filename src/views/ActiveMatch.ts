@@ -745,6 +745,13 @@ export class ActiveMatch {
         }
       }
 
+      // Auto-finish when all labeled rounds have been played
+      const labels = this.game?.roundLabels;
+      if (labels && labels.length > 0 && this.currentRound > labels.length) {
+        await this.handleFinishMatch();
+        return;
+      }
+
       this.reRender();
     } catch (err) {
       console.error('Failed to save scores:', err);

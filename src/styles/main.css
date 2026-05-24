@@ -2203,6 +2203,91 @@ button, input, select, textarea {
   user-select: none;
 }
 
+/* ── Scoreboard view toggle buttons ── */
+.sb-view-btn {
+  background: rgba(255,255,255,0.07);
+  border: none;
+  color: #475569;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.sb-view-btn:hover { background: rgba(255,255,255,0.13); color: #94a3b8; }
+.sb-view-btn--active { background: rgba(99,102,241,0.25); color: #a5b4fc; }
+
+/* ── Scoreboard table view ── */
+.sbt-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
+.sbt {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.sbt-corner {
+  width: 6rem;
+  min-width: 4.5rem;
+}
+.sbt-player-head {
+  text-align: center;
+  font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+  font-weight: 700;
+  color: var(--pc, #f1f5f9);
+  padding: 0.6rem 0.75rem 1rem;
+  border-bottom: 2px solid rgba(255,255,255,0.1);
+  white-space: nowrap;
+}
+.sbt-dot {
+  display: inline-block;
+  width: 0.65em;
+  height: 0.65em;
+  border-radius: 50%;
+  margin-right: 0.35em;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.sbt-label {
+  font-size: clamp(0.9rem, 2vw, 1.3rem);
+  font-weight: 600;
+  color: #64748b;
+  padding: 0.55rem 0.75rem 0.55rem 0;
+  white-space: nowrap;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.sbt-label--total {
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: clamp(1rem, 2.2vw, 1.4rem);
+  padding-top: 0.85rem;
+  border-top: 2px solid rgba(255,255,255,0.12);
+  border-bottom: none;
+}
+.sbt-cell {
+  text-align: center;
+  font-size: clamp(1.4rem, 3.5vw, 2.2rem);
+  font-weight: 700;
+  color: #e2e8f0;
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.sbt-total-row .sbt-total {
+  text-align: center;
+  font-size: clamp(1.9rem, 5vw, 3.2rem);
+  font-weight: 800;
+  color: #fbbf24;
+  padding: 0.85rem 0.5rem 0.4rem;
+  border-top: 2px solid rgba(255,255,255,0.12);
+}
+
 /* ── Scoreboard round banner ── */
 .sb-round-banner {
   text-align: center;

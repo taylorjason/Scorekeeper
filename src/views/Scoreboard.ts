@@ -19,6 +19,7 @@ export class Scoreboard {
   private playerScores: PlayerScore[] = [];
   private currentRound = 0;
   private lastUpdated = new Date();
+  private _view: 'cards' | 'table' = 'cards';
 
   private _pollInterval: ReturnType<typeof setInterval> | null = null;
   private _dataChangedHandler: (() => void) | null = null;
@@ -192,6 +193,41 @@ export class Scoreboard {
     }).join('');
   }
 
+  private _renderTableView(): string {
+    if (this.players.length === 0) return '<p class="sb-error">No players</p>';
+
+    const rounds = this.currentRound > 0
+      ? Array.from({ length: this.currentRound }, (_, i) => i + 1)
+      : [];
+
+    const header = `<tr>
+      <th class="sbt-corner"></th>
+      ${this.players.map(p => `<th class="sbt-player-head" style="--pc:${p.color}">
+        <span class="sbt-dot" style="background:${p.color}"></span>
+        ${this._esc(p.displayName)}
+      </th>`).join('')}
+    </tr>`;
+
+    const bodyRows = rounds.map(r => {
+      const cells = this.players.map(p => {
+        const entry = this.entries.find(e => e.playerId === p.id && e.roundNumber === r);
+        return `<td class="sbt-cell">${entry != null ? entry.value : '—'}</td>`;
+      }).join('');
+      return `<tr><td class="sbt-label">${this._esc(this._roundLabel(r))}</td>${cells}</tr>`;
+    }).join('');
+
+    const totals = this.players.map(p => {
+      const t = this.entries.filter(e => e.playerId === p.id).reduce((s, e) => s + e.value, 0);
+      return `<td class="sbt-total">${t}</td>`;
+    }).join('');
+    const totalRow = `<tr class="sbt-total-row"><td class="sbt-label sbt-label--total">Total</td>${totals}</tr>`;
+
+    return `<div class="sbt-wrap"><table class="sbt">
+      <thead>${header}</thead>
+      <tbody>${bodyRows}${totalRow}</tbody>
+    </table></div>`;
+  }
+
   render(): string {
     if (!this.match || !this.game || !this.night) {
       return `<div class="scoreboard"><p class="sb-error">Match not found</p></div>`;
@@ -208,6 +244,21 @@ export class Scoreboard {
 
     const roundBannerText = this._currentRoundBannerText();
 
+    const cardsActive = this._view === 'cards';
+    const viewToggle = `
+      <button class="sb-view-btn ${cardsActive ? 'sb-view-btn--active' : ''}" id="sb-view-cards" aria-label="Card view" title="Card view">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </button>
+      <button class="sb-view-btn ${!cardsActive ? 'sb-view-btn--active' : ''}" id="sb-view-table" aria-label="Table view" title="Table view">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+          <line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/>
+        </svg>
+      </button>`;
+
     return `
       <div class="scoreboard">
         <div class="sb-header">
@@ -216,6 +267,7 @@ export class Scoreboard {
             <div class="sb-night-name" id="sb-night-name">${this._esc(this.night.title)} · ${roundText}</div>
           </div>
           <div class="sb-header-right">
+            ${viewToggle}
             ${statusBadge}
             <button class="sb-close" id="sb-close" aria-label="Close scoreboard">✕</button>
           </div>
@@ -224,7 +276,7 @@ export class Scoreboard {
         ${roundBannerText ? `<div class="sb-round-banner" id="sb-round-banner">${this._esc(roundBannerText)}</div>` : ''}
 
         <div class="sb-players" id="sb-players">
-          ${this._renderCards()}
+          ${cardsActive ? this._renderCards() : this._renderTableView()}
         </div>
 
         <div class="sb-footer" id="sb-footer">
@@ -237,6 +289,13 @@ export class Scoreboard {
     document.getElementById('sb-close')?.addEventListener('click', () => {
       if (window.history.length > 1) window.history.back();
       else navigate('dashboard');
+    });
+
+    document.getElementById('sb-view-cards')?.addEventListener('click', () => {
+      if (this._view !== 'cards') { this._view = 'cards'; this._patch(); }
+    });
+    document.getElementById('sb-view-table')?.addEventListener('click', () => {
+      if (this._view !== 'table') { this._view = 'table'; this._patch(); }
     });
 
     this._pollInterval = setInterval(() => {
@@ -260,7 +319,11 @@ export class Scoreboard {
 
   private _patch(): void {
     const playersEl = document.getElementById('sb-players');
-    if (playersEl) playersEl.innerHTML = this._renderCards();
+    if (playersEl) playersEl.innerHTML = this._view === 'cards' ? this._renderCards() : this._renderTableView();
+
+    // Sync view toggle button active states
+    document.getElementById('sb-view-cards')?.classList.toggle('sb-view-btn--active', this._view === 'cards');
+    document.getElementById('sb-view-table')?.classList.toggle('sb-view-btn--active', this._view === 'table');
 
     if (this.game && this.night) {
       const isCompleted = this.match?.status === 'completed';

@@ -23,6 +23,7 @@ export class ActiveMatch {
   private playerScores: PlayerScore[] = [];
   private currentRound: number = 1;
   private nightMatches: Match[] = [];
+  private nightMatchGames: Map<number, Game> = new Map();
   private tableView: boolean = false;
   private customStats: CustomStatEntry[] = [];
   private customFieldsExpanded: boolean = false;
@@ -55,6 +56,13 @@ export class ActiveMatch {
     this.entries = entries;
     this.nightMatches = nightMatches;
     this.customStats = customStats;
+
+    // Load game names for all matches in this night
+    const gameIds = [...new Set(nightMatches.map(m => m.gameId))];
+    const nightGames = gameIds.length > 0
+      ? await db.games.where('id').anyOf(gameIds).toArray()
+      : [];
+    this.nightMatchGames = new Map(nightGames.map(g => [g.id!, g]));
 
     // Sort players to match the match.playerIds order
     this.players = this.match.playerIds.map(pid =>
@@ -566,13 +574,18 @@ export class ActiveMatch {
       `;
     }
 
-    // Match progress indicator
+    // Match switcher
     const progressHtml = this.nightMatches.length > 1
-      ? `<div class="flex gap-2 items-center justify-center mb-3">
-          ${this.nightMatches.map((m) => {
+      ? `<div class="match-switcher" role="navigation" aria-label="Switch match">
+          ${this.nightMatches.map((m, idx) => {
             const isActive = m.id === this.matchId;
             const isDone = m.status === 'completed';
-            return `<div style="width:8px; height:8px; border-radius:50%; background:${isActive ? 'var(--primary)' : isDone ? 'var(--success)' : 'var(--border)'}"></div>`;
+            const gameName = this.nightMatchGames.get(m.gameId)?.name ?? `Match ${idx + 1}`;
+            const stateClass = isActive ? 'match-pill--active' : isDone ? 'match-pill--done' : 'match-pill--idle';
+            const label = isDone ? `✓ ${gameName}` : gameName;
+            return `<button class="match-pill ${stateClass}" data-match-id="${m.id}"
+              aria-label="Go to ${this.escHtml(gameName)}" aria-current="${isActive}"
+              ${isActive ? 'disabled' : ''}>${this.escHtml(label)}</button>`;
           }).join('')}
         </div>`
       : '';
@@ -649,6 +662,13 @@ export class ActiveMatch {
     document.getElementById('toggle-table')?.addEventListener('click', () => {
       this.tableView = true;
       this.reRender();
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.match-pill[data-match-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset['matchId'];
+        if (id) navigate('match', { id });
+      });
     });
 
     document.getElementById('back-to-dashboard')?.addEventListener('click', () => navigate('dashboard'));

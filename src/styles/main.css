@@ -1985,6 +1985,53 @@ button, input, select, textarea {
   color: var(--primary);
 }
 
+/* ─── Match switcher (multi-match nights) ────────────────────────────────────── */
+.match-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+.match-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.match-pill--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  cursor: default;
+}
+.match-pill--done {
+  background: rgba(16,185,129,0.12);
+  color: var(--success, #10b981);
+  border-color: rgba(16,185,129,0.35);
+}
+.match-pill--done:hover {
+  background: rgba(16,185,129,0.2);
+}
+.match-pill--idle {
+  background: var(--surface);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+.match-pill--idle:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
 /* ─── Custom Stat Fields — Settings form ─────────────────────────────────────── */
 .cfield-add-row {
   display: flex;

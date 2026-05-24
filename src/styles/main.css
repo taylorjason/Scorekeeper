@@ -571,13 +571,13 @@ button, input, select, textarea {
 .score-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 1.22rem;
   min-width: 280px;
 }
 .score-table th {
   padding: 0.55rem 0.6rem;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 1.08rem;
   font-weight: 600;
   white-space: nowrap;
   background: var(--surface);
@@ -585,7 +585,7 @@ button, input, select, textarea {
 .score-table-corner {
   text-align: left !important;
   color: var(--text-muted);
-  font-size: 0.7rem !important;
+  font-size: 1.01rem !important;
 }
 .score-table-round-row {
   background: var(--surface);
@@ -600,7 +600,7 @@ button, input, select, textarea {
 }
 .score-table-label {
   padding: 0.45rem 0.6rem;
-  font-size: 0.75rem;
+  font-size: 1.08rem;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -608,7 +608,7 @@ button, input, select, textarea {
 }
 .score-table-label-total {
   padding: 0.3rem 0.6rem;
-  font-size: 0.7rem;
+  font-size: 1.01rem;
   color: var(--text-muted);
   font-style: italic;
   border-right: 1px solid var(--border);
@@ -629,7 +629,7 @@ button, input, select, textarea {
 .score-table-total {
   padding: 0.3rem 0.5rem;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 1.08rem;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
 }
@@ -1665,6 +1665,8 @@ button, input, select, textarea {
     transform: none;
     padding-bottom: 2.5rem; /* room for version footer at bottom */
     overflow-y: auto;
+    overflow-x: hidden;
+    transition: width 0.22s ease;
   }
 
   .sidebar-brand {
@@ -1676,12 +1678,32 @@ button, input, select, textarea {
     margin-bottom: 0.5rem;
     flex-shrink: 0;
   }
-  .sidebar-brand-icon { font-size: 1.5rem; line-height: 1; }
+  .sidebar-brand-icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
   .sidebar-brand-name {
     font-size: 1rem;
     font-weight: 700;
     color: var(--text);
     letter-spacing: -0.01em;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .sidebar-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+  }
+  .sidebar-toggle-btn:hover {
+    color: var(--text);
+    background: rgba(99, 102, 241, 0.1);
   }
 
   /* Nav items as sidebar rows */
@@ -1799,6 +1821,50 @@ button, input, select, textarea {
   /* Remove stacked top-margin on the first card in the right column */
   .match-col-right .card:first-child {
     margin-top: 0;
+  }
+
+  /* ── Collapsed sidebar ── */
+  body.sidebar-collapsed {
+    --sidebar-width: 64px;
+  }
+  body.sidebar-collapsed .bottom-nav {
+    align-items: center;
+  }
+  body.sidebar-collapsed .sidebar-brand {
+    padding: 1rem 0;
+    justify-content: center;
+    border-bottom: 1px solid var(--border);
+  }
+  body.sidebar-collapsed .sidebar-brand-name {
+    display: none;
+  }
+  body.sidebar-collapsed .sidebar-toggle-btn {
+    display: none;
+  }
+  body.sidebar-collapsed .sidebar-brand-icon {
+    font-size: 1.75rem;
+    cursor: pointer;
+  }
+  body.sidebar-collapsed .nav-item {
+    justify-content: center;
+    padding: 0.75rem 0;
+    margin: 2px 0;
+    width: 100%;
+    border-radius: 0;
+  }
+  body.sidebar-collapsed .nav-item span {
+    display: none !important;
+  }
+  body.sidebar-collapsed .nav-item svg {
+    width: 22px;
+    height: 22px;
+  }
+  body.sidebar-collapsed .version-footer {
+    display: none;
+  }
+  body.sidebar-collapsed .app-header,
+  body.sidebar-collapsed .main-content {
+    transition: margin-left 0.22s ease;
   }
 }
 
@@ -2039,5 +2105,110 @@ button, input, select, textarea {
   font-size: 0.7rem;
   color: #1e293b;
   user-select: none;
+}
+
+/* ── Scoreboard round banner ── */
+.sb-round-banner {
+  text-align: center;
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  padding: clamp(0.75rem, 2vw, 1.25rem) 1rem clamp(0.5rem, 1.5vw, 1rem);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 0.25rem;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+/* ─── Round Display Mode ────────────────────────────────────────────────────── */
+.round-display-mode .app-header,
+.round-display-mode .bottom-nav,
+.round-display-mode .version-footer {
+  display: none !important;
+}
+.round-display-mode .main-content {
+  margin-left: 0 !important;
+  padding: 0 !important;
+}
+
+.rd-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #0f172a;
+  color: #fff;
+  padding: env(safe-area-inset-top, 1rem) env(safe-area-inset-right, 1rem) env(safe-area-inset-bottom, 1rem) env(safe-area-inset-left, 1rem);
+  text-align: center;
+  overflow: hidden;
+}
+
+.rd-close {
+  position: absolute;
+  top: max(env(safe-area-inset-top, 0px), 1rem);
+  right: max(env(safe-area-inset-right, 0px), 1rem);
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 1.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.rd-close:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+.rd-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.75rem, 3vw, 1.5rem);
+  padding: 1rem;
+  max-width: 90vw;
+}
+
+.rd-game-name {
+  font-size: clamp(0.9rem, 3.5vw, 1.25rem);
+  font-weight: 600;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.rd-headline {
+  font-size: clamp(3.5rem, 18vw, 7rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #fff;
+  text-shadow: 0 4px 32px rgba(99,102,241,0.4);
+}
+
+.rd-done {
+  color: rgba(255,255,255,0.5);
+}
+
+.rd-subline {
+  font-size: clamp(1rem, 4.5vw, 1.75rem);
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: -0.01em;
+}
+
+.rd-updated {
+  font-size: clamp(0.65rem, 2.5vw, 0.85rem);
+  color: rgba(255,255,255,0.25);
+  margin-top: clamp(1rem, 5vw, 2rem);
+}
+
+.rd-error {
+  color: #ef4444;
+  font-size: 1.25rem;
 }
 

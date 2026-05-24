@@ -1911,7 +1911,7 @@ button, input, select, textarea {
 
 /* ─── Dealer badges ──────────────────────────────────────────────────────────── */
 .dealer-badge {
-  font-size: 0.9em;
+  font-size: 1.58em;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -1919,10 +1919,10 @@ button, input, select, textarea {
   position: absolute;
   top: 0.4rem;
   right: 0.4rem;
-  font-size: 1.1rem;
+  font-size: 1.93rem;
 }
 .sb-dealer-badge {
-  font-size: 0.6em;
+  font-size: 1.05em;
   vertical-align: middle;
   margin-left: 0.3em;
   opacity: 0.9;
@@ -2150,6 +2150,11 @@ button, input, select, textarea {
   color: #e2e8f0;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
+}
+.sb-gap--tie {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fbbf24;
 }
 /* Phase 10: phase and penalty are direct rows in sb-player-body */
 .sb-phase {

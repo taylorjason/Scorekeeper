@@ -125,6 +125,20 @@ export class ActiveMatch {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  private _effectiveRanks(): number[] {
+    const ranks: number[] = [];
+    for (let i = 0; i < this.playerScores.length; i++) {
+      if (i === 0) { ranks.push(0); continue; }
+      const curr = this.playerScores[i];
+      const prev = this.playerScores[i - 1];
+      const tied = this.game?.scoringMode === 'phase10'
+        ? this.getPlayerCurrentPhase(curr.player) === this.getPlayerCurrentPhase(prev.player) && curr.total === prev.total
+        : curr.total === prev.total;
+      ranks.push(tied ? ranks[i - 1] : i);
+    }
+    return ranks;
+  }
+
   private _currentDealerId(): number | null {
     if (this.match?.firstDealerIndex == null || this.players.length === 0) return null;
     const idx = (this.match.firstDealerIndex + this.currentRound - 1) % this.players.length;
@@ -253,14 +267,16 @@ export class ActiveMatch {
 
     const isPhase10 = mode === 'phase10';
     const dealerId = this._currentDealerId();
-    const scoreCardsHtml = this.playerScores.map((ps, rank) => {
+    const effRanks = this._effectiveRanks();
+    const scoreCardsHtml = this.playerScores.map((ps, i) => {
+      const er = effRanks[i];
       const isDealer = ps.player.id === dealerId;
       if (isPhase10) {
         const phase = this.getPlayerCurrentPhase(ps.player);
         const isDone = phase > 10;
         return `
-          <div class="score-card ${this.rankClass(rank)}" aria-label="${this.escHtml(ps.player.displayName)}: Phase ${isDone ? '10 done' : phase}, ${ps.total} pts">
-            ${rank < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(rank)}</span>` : ''}
+          <div class="score-card ${this.rankClass(er)}" aria-label="${this.escHtml(ps.player.displayName)}: Phase ${isDone ? '10 done' : phase}, ${ps.total} pts">
+            ${er < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(er)}</span>` : ''}
             ${isDealer ? '<span class="dealer-badge dealer-badge--card" title="Current dealer">🃏</span>' : ''}
             <div class="player-avatar" style="background:${ps.player.color}">
               ${ps.player.displayName.charAt(0).toUpperCase()}
@@ -272,8 +288,8 @@ export class ActiveMatch {
         `;
       }
       return `
-        <div class="score-card ${this.rankClass(rank)}" aria-label="${this.escHtml(ps.player.displayName)}: ${ps.total} points">
-          ${rank < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(rank)}</span>` : ''}
+        <div class="score-card ${this.rankClass(er)}" aria-label="${this.escHtml(ps.player.displayName)}: ${ps.total} points">
+          ${er < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(er)}</span>` : ''}
           ${isDealer ? '<span class="dealer-badge dealer-badge--card" title="Current dealer">🃏</span>' : ''}
           <div class="player-avatar" style="background:${ps.player.color}">
             ${ps.player.displayName.charAt(0).toUpperCase()}

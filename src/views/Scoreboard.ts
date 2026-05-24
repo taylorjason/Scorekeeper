@@ -100,6 +100,22 @@ export class Scoreboard {
     return `Round ${roundNumber}`;
   }
 
+  private _isTied(a: PlayerScore, b: PlayerScore): boolean {
+    if (this.game?.scoringMode === 'phase10') {
+      return (a.phase ?? 1) === (b.phase ?? 1) && a.total === b.total;
+    }
+    return a.total === b.total;
+  }
+
+  private _effectiveRanks(): number[] {
+    const ranks: number[] = [];
+    for (let i = 0; i < this.playerScores.length; i++) {
+      if (i === 0) { ranks.push(0); continue; }
+      ranks.push(this._isTied(this.playerScores[i], this.playerScores[i - 1]) ? ranks[i - 1] : i);
+    }
+    return ranks;
+  }
+
   private _currentDealerId(): number | null {
     if (this.match?.firstDealerIndex == null || this.players.length === 0) return null;
     // Active round = last scored + 1 (matches what the round banner shows)
@@ -128,12 +144,14 @@ export class Scoreboard {
     const isPhase10 = this.game?.scoringMode === 'phase10';
     const isLow = this.game?.scoringMode === 'low';
     const dealerId = this._currentDealerId();
+    const effRanks = this._effectiveRanks();
 
-    return this.playerScores.map((ps, rank) => {
-      const rankClass = rank === 0 ? 'sb-rank-1' : rank === 1 ? 'sb-rank-2' : rank === 2 ? 'sb-rank-3' : '';
+    return this.playerScores.map((ps, i) => {
+      const er = effRanks[i];
+      const rankClass = er === 0 ? 'sb-rank-1' : er === 1 ? 'sb-rank-2' : er === 2 ? 'sb-rank-3' : '';
       const isDealer = ps.player.id === dealerId;
-      const medal = rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : String(rank + 1);
-      const medalHtml = rank < 3
+      const medal = er === 0 ? '🥇' : er === 1 ? '🥈' : er === 2 ? '🥉' : String(er + 1);
+      const medalHtml = er < 3
         ? `<span class="sb-medal">${medal}</span>`
         : `<span class="sb-rank-num">${medal}</span>`;
 
@@ -141,19 +159,18 @@ export class Scoreboard {
       if (isPhase10) {
         const phase = ps.phase ?? 1;
         const done = phase > 10;
-        // Phase 10: 3 rows — name (in player-body), phase, penalty
         scoreHtml = `
           <div class="sb-phase">${done ? '🏆 Done' : `Phase ${phase}`}</div>
           <div class="sb-penalty">${ps.total} pts</div>`;
       } else {
         let gapHtml = '';
-        if (rank > 0 && this.playerScores.length > 1) {
+        if (er > 0 && this.playerScores.length > 1) {
           const gap = isLow
             ? ps.total - this.playerScores[0].total
             : this.playerScores[0].total - ps.total;
           if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '−'}${gap} behind</div>`;
+          else if (gap === 0) gapHtml = `<div class="sb-gap sb-gap--tie">TIE</div>`;
         }
-        // Regular: 2 rows — name, then score with gap badge below it
         scoreHtml = `
           <div class="sb-score-area">
             <div class="sb-score">${ps.total}</div>

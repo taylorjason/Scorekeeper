@@ -94,6 +94,21 @@ export class Scoreboard {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  private _roundLabel(roundNumber: number): string {
+    const labels = this.game?.roundLabels;
+    if (labels && labels.length >= roundNumber) return labels[roundNumber - 1];
+    return `Round ${roundNumber}`;
+  }
+
+  private _currentRoundBannerText(): string {
+    if (this.currentRound === 0) return '';
+    const isPhase10 = this.game?.scoringMode === 'phase10';
+    if (isPhase10) {
+      return `${this.currentRound} Hand${this.currentRound !== 1 ? 's' : ''} Played`;
+    }
+    return this._roundLabel(this.currentRound);
+  }
+
   private _renderCards(): string {
     const isPhase10 = this.game?.scoringMode === 'phase10';
     const isLow = this.game?.scoringMode === 'low';
@@ -154,6 +169,8 @@ export class Scoreboard {
       ? `<span class="sb-badge-final">Final</span>`
       : `<div class="sb-live"><div class="sb-live-dot"></div><span>Live</span></div>`;
 
+    const roundBannerText = this._currentRoundBannerText();
+
     return `
       <div class="scoreboard">
         <div class="sb-header">
@@ -166,6 +183,8 @@ export class Scoreboard {
             <button class="sb-close" id="sb-close" aria-label="Close scoreboard">✕</button>
           </div>
         </div>
+
+        ${roundBannerText ? `<div class="sb-round-banner" id="sb-round-banner">${this._esc(roundBannerText)}</div>` : ''}
 
         <div class="sb-players" id="sb-players">
           ${this._renderCards()}
@@ -214,6 +233,9 @@ export class Scoreboard {
       const nightEl = document.getElementById('sb-night-name');
       if (nightEl) nightEl.textContent = `${this.night.title} · ${roundText}`;
     }
+
+    const roundBanner = document.getElementById('sb-round-banner');
+    if (roundBanner) roundBanner.textContent = this._currentRoundBannerText();
 
     const footer = document.getElementById('sb-footer');
     if (footer) footer.textContent = `Updated ${this.lastUpdated.toLocaleTimeString()}`;

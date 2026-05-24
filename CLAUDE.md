@@ -1,234 +1,197 @@
-```markdown
-# Game Night Scorekeeper - COMPLETE PROJECT SPECIFICATION
+# Game Night Scorekeeper — Project Guide for Claude
 
-## Overview
+## What This Is
 
-Static, mobile-first web app for tracking scores and stats during weekly friends' game nights. Supports multiple games, player history, persistent local storage (IndexedDB), and optional GitHub repo sync for backups. Deploys to GitHub Pages.
+A mobile-first Progressive Web App for tracking board game scores across weekly game nights. Fully static (no server), deployed to GitHub Pages. Primary device is a phone held in one hand.
 
-**Key Goals:**
-- Fast, one-handed score entry on phones
-- Offline-first with automatic local saves  
-- Cross-session stats and history
-- Optional cloud backup via GitHub API
+Live: https://taylorjason.github.io/Scorekeeper/
 
-## Architecture
+---
 
-```
-FRONT-END ONLY: HTML/CSS/JS (or React/Vue → static build)
-STORAGE: IndexedDB (primary) + localStorage (config/PAT)
-SYNC: GitHub REST API v3 Contents endpoint
-OFFLINE: Service Worker + PWA manifest
-DEPLOYMENT: GitHub Pages (static hosting)
-```
+## Tech Stack
 
-No server, database, or external auth beyond user-provided GitHub PAT.
-
-## Data Model (EXACT)
-
-| Entity | Fields |
+| Layer | Choice |
 |---|---|
-| **Player** | `id`, `displayName`, `color`, `active`, `createdAt` |
-| **Game** | `id`, `name`, `scoringMode`, `rules`, `targetScore`, `createdAt` |
-| **GameNight** | `id`, `title`, `date`, `notes`, `createdAt` |
-| **Match** | `id`, `gameNightId`, `gameId`, `playerIds[]`, `status`, `winnerId`, `createdAt` |
-| **ScoreEntry** | `id`, `matchId`, `playerId`, `roundNumber`, `value`, `note`, `createdAt` |
-| **StatSnapshot** | `playerId`, `gameId`, `wins`, `losses`, `avgScore`, `lastPlayed` |
-| **SyncConfig** | `username`, `repo`, `pat`, `filePath`, `branch`, `lastSync` |
+| Language | TypeScript |
+| Build | Vite 8 |
+| Storage | Dexie.js → IndexedDB (primary) |
+| Real-time sync | Firebase Firestore (hardcoded project config) |
+| Backup sync | GitHub / Gitea REST API |
+| Charts | Chart.js |
+| QR codes | qrcode |
+| PWA | vite-plugin-pwa (Service Worker + manifest) |
+| CSS | Custom hand-written CSS (~2200 lines), no framework |
+| Routing | Hash-based SPA (`#/route/param`) |
 
-**Full app state → single JSON file for sync (`data/game-stats.json`)**
-
-## Core Features
-
-### 1. Main Flows
-```
-DASHBOARD → NEW GAME NIGHT → SELECT GAME/PLAYERS → SCORE → STATS/HISTORY
-```
-
-### 2. Scoring Modes
-- [ ] Higher score wins
-- [ ] Lower score wins  
-- [ ] Points per round
-- [ ] Finish order ranking
-- [ ] Custom target/bonuses
-
-### 3. Persistence
-```
-LOCAL (PRIMARY): Auto-save every score entry to IndexedDB
-CLOUD (OPTIONAL): GitHub API PUT/GET JSON export
-SECURITY: PAT stored in localStorage (warn user)
-```
-
-### 4. UI Screens
-```
-1. DASHBOARD: Recent nights + quick stats
-2. NEW NIGHT: Title/date + game/player picker
-3. SCORING: Live totals, rankings, big buttons
-4. HISTORY: Filter by player/game/night
-5. STATS: Wins, avg, trends (charts)
-6. SETTINGS: Players/games + GitHub sync
-```
-
-## GitHub Sync Details
-
-**User provides:**
-```
-USERNAME: their GitHub username
-REPO: target repo name  
-PAT: Personal Access Token (repo/Contents:write scope)
-FILE: data/game-stats.json (default)
-BRANCH: main (default)
-```
-
-**API Calls:**
-```javascript
-// READ
-GET https://api.github.com/repos/{user}/{repo}/contents/{path}
-Authorization: Bearer ${pat}
-
-// WRITE  
-PUT same URL
-{ message: "Game stats sync", content: btoa(JSON.stringify(data)), sha: currentSHA }
-```
-
-**Flow:** Settings → Test Connection → Save/Load buttons → Auto-prompt after game night
-
-## Technical Stack
-
-```
-RECOMMENDED:
-├── TypeScript (safety)
-├── Dexie.js (IndexedDB wrapper) 
-├── Tailwind CSS (mobile-first)
-├── Chart.js (stats viz)
-├── Vite (build tool → static)
-├── Vanilla JS modules (lightest)
-
-MINIMAL:
-├── Vanilla HTML/CSS/JS
-├── Native IndexedDB
-├── CSS Grid/Flexbox
-```
-
-## File Structure (FINAL)
-
-```
-├── index.html           # App entry
-├── src/
-│   ├── app.js          # Main state/UI
-│   ├── db.js           # IndexedDB wrapper
-│   ├── github.js       # API sync logic
-│   ├── models.js       # Data classes
-│   ├── scoring.js      # Game logic
-│   ├── stats.js        # Calculations
-│   └── ui.js           # Screen rendering
-├── css/app.css
-├── sw.js              # Service Worker
-├── manifest.json      # PWA
-├── README.md          # User guide
-└── docs/
-    └── spec.md        # This file
-```
-
-## Development Workflow (16+ Commits)
-
-```
-PHASE 1 (Foundation)
-1. "feat: HTML/CSS mobile structure"
-2. "feat: IndexedDB setup + models" 
-3. "feat: localStorage sync config"
-
-PHASE 2 (Core UI)
-4. "feat: player CRUD"
-5. "feat: game definitions"
-6. "feat: game night + dashboard"
-7. "feat: scoring UI + live totals"
-
-PHASE 3 (Persistence)
-8. "feat: auto-save scores"
-9. "feat: stats engine"
-10. "feat: history + undo"
-
-PHASE 4 (GitHub Sync)
-11. "feat: sync settings UI"
-12. "feat: GitHub API read"
-13. "feat: GitHub API write"
-
-PHASE 5 (Polish)
-14. "feat: responsive + a11y"
-15. "feat: PWA/offline"
-16. "chore: deploy + demo data"
-```
-
-## Testing Checklist (Before Each Push)
-
-- [ ] Data persists after refresh/close
-- [ ] All scoring modes work
-- [ ] Stats calculate correctly
-- [ ] GitHub sync (test PAT)
-- [ ] Mobile responsive (<600px)
-- [ ] Offline after first load
-- [ ] No console errors
-
-## README.md Template
-
-```markdown
-# Game Night Scorekeeper
-
-Mobile scorekeeper for game nights with stats + GitHub backup.
-
-## Quick Start
-1. Open `index.html`
-2. Add players/games in Settings
-3. Start scoring!
-
-## GitHub Sync  
-1. Settings → GitHub Sync
-2. Enter username/repo/PAT
-3. Test → Sync Now
-
-## Deploy to Pages
-```bash
-npm run build
-git subtree push --prefix dist origin gh-pages
-```
-
-## Data Locations
-- **Local**: Browser IndexedDB
-- **Backup**: Your repo `/data/game-stats.json`
-```
-
-## Acceptance Criteria
-
-✅ **Create/track complete game night**  
-✅ **Data survives browser restart**  
-✅ **Stats/history work across sessions**  
-✅ **GitHub sync reads/writes**  
-✅ **Works 100% offline**  
-✅ **Deploys to GitHub Pages**  
-✅ **16+ git commits with history**
+No React, no Vue, no Tailwind. Views are plain TypeScript classes with `render() → string` + `afterRender()`.
 
 ---
 
-## LLM BUILD PROMPT
+## File Structure
 
 ```
-Build this Game Night Scorekeeper per EXACT spec above.
-
-1. Follow 16-commit workflow
-2. Use data model EXACTLY as tabled  
-3. Mobile-first UI (phone = primary)
-4. IndexedDB primary, GitHub sync secondary
-5. Static output for GitHub Pages
-6. Test each commit before push
-
-DELIVER: Complete source code + README + git history.
+src/
+├── main.ts           # App shell HTML, routing init, Firebase init, sidebar toggle
+├── router.ts         # parseRoute / navigate / onRouteChange (hash-based, 8 routes)
+├── types.ts          # All TypeScript interfaces
+├── db.ts             # Dexie schema + CRUD helpers (getMatch, addScoreEntry, etc.)
+├── demo.ts           # Seeds demo data on first run (skipped when Firebase active)
+├── firebase-sync.ts  # Firestore real-time sync; hardcoded Firebase config
+├── github.ts         # GitHub + Gitea REST API import/export
+├── stats.ts          # Win-rate, avg-score, trend calculations
+├── toast.ts          # showToast(message, type) utility
+├── vite-env.d.ts     # __APP_VERSION__, __BUILD_NUMBER__, __BUILD_TIME__ globals
+├── styles/
+│   └── main.css      # All styles; mobile-first with 900px desktop breakpoint
+└── views/
+    ├── Dashboard.ts      # Recent nights, quick player stats
+    ├── NewNight.ts       # Create game night + add matches
+    ├── ActiveMatch.ts    # Live scoring, undo, finish match
+    ├── History.ts        # Browsable past game nights
+    ├── Stats.ts          # Charts, win rates, leaderboard
+    ├── Settings.ts       # Players, games, Firebase room, GitHub sync
+    ├── Scoreboard.ts     # Full-screen scoreboard (opens new tab)
+    └── RoundDisplay.ts   # Full-screen round display for iPhone (opens new tab)
 ```
 
 ---
 
-**SAVE AS `game-night-scorekeeper.md`** and give to any LLM. Contains everything needed for complete implementation.
+## Routes
+
+| Hash | View | Notes |
+|---|---|---|
+| `#/dashboard` | Dashboard | Default route |
+| `#/new-night` | NewNight | |
+| `#/match/:id` | ActiveMatch | |
+| `#/history` | History | |
+| `#/stats` | Stats | |
+| `#/settings` | Settings | |
+| `#/scoreboard/:id` | Scoreboard | Opens in new tab; hides app shell |
+| `#/round-display/:id` | RoundDisplay | Opens in new tab; hides app shell |
+
+`scoreboard-mode` / `round-display-mode` body classes hide the nav, header, and footer when those views are active.
+
+---
+
+## Data Model
+
+```typescript
+Player      { id, displayName, color: string /* hex */, active, createdAt }
+Game        { id, name, scoringMode, rules?, targetScore?, roundLabels?: string[], createdAt }
+GameNight   { id, title, date /* YYYY-MM-DD */, notes?, createdAt }
+Match       { id, gameNightId, gameId, playerIds: number[], status, winnerId?, createdAt }
+ScoreEntry  { id, matchId, playerId, roundNumber, value, note?, createdAt }
+StatSnapshot { id, playerId, gameId, wins, losses, avgScore, lastPlayed }
+FirebaseRoomConfig { roomId, apiKey?, projectId?, appId?, lastSync? }
+SyncConfig  { provider, baseUrl?, username, repo, pat, filePath, branch, lastSync? }
 ```
 
-**Click "Download" or copy-paste to create `game-night-scorekeeper.md`** - ready for LLM development! 🚀
+`ScoreEntry.note` carries structured JSON for special modes:
+- Phase 10: `{"phase": 3, "completed": true}`
+- UNO first-out: `"first_out"` (string, not JSON)
 
-Sources
+---
+
+## Scoring Modes
+
+| Mode | Win condition | Notes |
+|---|---|---|
+| `high` | Highest total | Default |
+| `low` | Lowest total | Golf, etc. |
+| `rounds` | Highest total across rounds | Per-round entry UI |
+| `finish-order` | Earliest finisher wins | Position-based |
+| `custom` | Same as high | Use rules/notes field |
+| `phase10` | Most phases + lowest penalty | Special sort: phase DESC, total ASC |
+
+`Game.roundLabels` provides per-round names (e.g. `["Phase 1", "Phase 2", ...]`). Falls back to `Round N` when absent.
+
+---
+
+## Layout System
+
+### Mobile (< 900px)
+- Bottom nav bar with 5 icon+label buttons
+- FAB "New Night" button (hidden at ≥ 900px)
+- Full-width content
+
+### Desktop (≥ 900px)
+- Sidebar nav (220px default, collapses to 64px icon-only)
+- Collapse state persisted in `localStorage` (`scorekeeper_sidebar_collapsed`)
+- `body.sidebar-collapsed` drives all collapsed styles via `--sidebar-width: 64px`
+- `--sidebar-width` CSS custom property shifts header, main content, and version footer
+- Smooth 0.22s width transition
+
+### Scoreboard / Round Display
+- Body class hides all shell elements
+- `margin-left: 0 !important` overrides sidebar shift on `.main-content`
+- Scoreboard: dark full-screen grid of player cards, auto-refreshes every 5s
+- Round Display: single large centered text, optimized for iPhone safe areas
+
+---
+
+## Firebase Sync
+
+Firebase project credentials are **hardcoded** in `firebase-sync.ts`:
+
+```typescript
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyBbZi_h_jLEi3ioJ1IBpGq2x4Uk7XN1mKA',
+  projectId: 'scorekeeper-c9b39',
+  appId: '1:762963882089:web:68bafeb234d5d05f5d32f8',
+};
+```
+
+Users only enter a **Room ID** (short string). The room ID namespaces documents in Firestore. Multiple devices sharing the same Room ID stay in sync in real time.
+
+- `buildShareableUrl(config)` → `#room=<roomId>` hash link
+- `parseRoomFromHash()` auto-imports a Room ID from that hash on page load
+- `experimentalAutoDetectLongPolling: true` is set for better mobile/PWA compatibility
+- Demo data is skipped when a room is configured (avoids polluting shared room)
+
+---
+
+## GitHub / Gitea Sync
+
+Full data export/import via REST API. Supports both GitHub and self-hosted Gitea.
+
+- Data serialized as `AppData` JSON (all players, games, nights, matches, entries)
+- User provides: username, repo, PAT, file path, branch
+- PAT stored in `localStorage` — warn users not to use on shared devices
+
+---
+
+## View Pattern
+
+All views follow the same interface:
+
+```typescript
+class MyView {
+  async load(/* params */): Promise<void>  // fetch data from DB
+  render(): string                          // return full HTML string
+  afterRender(): void                       // attach event listeners
+  teardown?(): void                         // clear intervals, listeners (Scoreboard, RoundDisplay)
+}
+```
+
+`main.ts` calls `_viewTeardown?.()` before loading a new view. Only views that poll or listen to events need `teardown`.
+
+---
+
+## CSS Conventions
+
+- CSS custom properties: `--primary`, `--surface`, `--bg`, `--border`, `--text`, `--text-muted`, `--danger`, `--radius-sm`
+- `[data-theme="dark"]` / `[data-theme="light"]` on `<html>` for theming
+- `color-mix(in srgb, var(--pc) N%, #111827)` for player-color card tinting
+- `clamp(min, preferred-vw, max)` for fluid scoreboard typography
+- Scoreboard player color exposed as `--pc` CSS custom property via inline style
+
+---
+
+## Key Gotchas
+
+- **Scoreboard margin**: `.scoreboard-mode .main-content` needs `margin-left: 0 !important` to override the 900px sidebar shift rule.
+- **Phase 10 sort**: Phase DESC (higher phase = better), then total ASC (fewer penalty pts).
+- **currentRound in ActiveMatch**: `max(roundNumber) + 1` — the round *being entered*, not the last completed one.
+- **currentRound in Scoreboard/RoundDisplay**: `max(roundNumber)` — the last *completed* round.
+- **Demo seed race**: `seedDemoData()` is skipped when Firebase is active; otherwise it checks `players.count > 0` before inserting.
+- **`window.scorekeeper:datachanged`** custom event fires after any DB write; Scoreboard listens to it for instant refresh without waiting for the poll interval.

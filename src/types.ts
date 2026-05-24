@@ -35,9 +35,10 @@ export interface Match {
   id?: number;
   gameNightId: number;
   gameId: number;
-  playerIds: number[]; // array of Player.id
+  playerIds: number[]; // array of Player.id, in play order
   status: 'active' | 'completed';
   winnerId?: number; // Player.id of winner
+  firstDealerIndex?: number; // index into playerIds for the first dealer
   createdAt: number;
 }
 

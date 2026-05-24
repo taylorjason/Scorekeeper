@@ -100,6 +100,13 @@ export class Scoreboard {
     return `Round ${roundNumber}`;
   }
 
+  private _currentDealerId(): number | null {
+    if (this.match?.firstDealerIndex == null || this.players.length === 0) return null;
+    // Active round = last scored + 1 (matches what the round banner shows)
+    const idx = (this.match.firstDealerIndex + this.currentRound) % this.players.length;
+    return this.match.playerIds[idx] ?? null;
+  }
+
   private _currentRoundBannerText(): string {
     const isPhase10 = this.game?.scoringMode === 'phase10';
     const isCompleted = this.match?.status === 'completed';
@@ -120,9 +127,11 @@ export class Scoreboard {
   private _renderCards(): string {
     const isPhase10 = this.game?.scoringMode === 'phase10';
     const isLow = this.game?.scoringMode === 'low';
+    const dealerId = this._currentDealerId();
 
     return this.playerScores.map((ps, rank) => {
       const rankClass = rank === 0 ? 'sb-rank-1' : rank === 1 ? 'sb-rank-2' : rank === 2 ? 'sb-rank-3' : '';
+      const isDealer = ps.player.id === dealerId;
       const medal = rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : String(rank + 1);
       const medalHtml = rank < 3
         ? `<span class="sb-medal">${medal}</span>`
@@ -156,7 +165,10 @@ export class Scoreboard {
         <div class="sb-player ${rankClass}" style="--pc:${ps.player.color}">
           <div class="sb-rank-area">${medalHtml}</div>
           <div class="sb-player-body">
-            <div class="sb-name">${this._esc(ps.player.displayName)}</div>
+            <div class="sb-name">
+              ${this._esc(ps.player.displayName)}
+              ${isDealer && this.match?.status !== 'completed' ? '<span class="sb-dealer-badge">🃏</span>' : ''}
+            </div>
             ${scoreHtml}
           </div>
         </div>`;

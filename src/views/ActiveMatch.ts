@@ -125,6 +125,12 @@ export class ActiveMatch {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  private _currentDealerId(): number | null {
+    if (this.match?.firstDealerIndex == null || this.players.length === 0) return null;
+    const idx = (this.match.firstDealerIndex + this.currentRound - 1) % this.players.length;
+    return this.match.playerIds[idx] ?? null;
+  }
+
   private renderScoreTable(): string {
     if (this.players.length === 0 || this.entries.length === 0) {
       return `<div class="text-sm text-muted" style="padding:1rem 0; text-align:center">No scores yet — add a round to see the table.</div>`;
@@ -136,11 +142,13 @@ export class ActiveMatch {
     const roundNums = [...new Set(this.entries.map(e => e.roundNumber))]
       .sort((a, b) => b - a); // descending
 
+    const dealerId = this._currentDealerId();
     const headerCells = this.players.map(p =>
       `<th style="background:${p.color}22; border-bottom: 2px solid ${p.color}">
         <div class="flex items-center gap-1 justify-center">
           <span class="player-dot" style="background:${p.color}; flex-shrink:0"></span>
           <span>${this.escHtml(p.displayName)}</span>
+          ${p.id === dealerId ? '<span class="dealer-badge" title="Current dealer">🃏</span>' : ''}
         </div>
       </th>`
     ).join('');
@@ -244,13 +252,16 @@ export class ActiveMatch {
     const allCompleted = this.nightMatches.every(m => m.status === 'completed' || m.id === this.matchId);
 
     const isPhase10 = mode === 'phase10';
+    const dealerId = this._currentDealerId();
     const scoreCardsHtml = this.playerScores.map((ps, rank) => {
+      const isDealer = ps.player.id === dealerId;
       if (isPhase10) {
         const phase = this.getPlayerCurrentPhase(ps.player);
         const isDone = phase > 10;
         return `
           <div class="score-card ${this.rankClass(rank)}" aria-label="${this.escHtml(ps.player.displayName)}: Phase ${isDone ? '10 done' : phase}, ${ps.total} pts">
             ${rank < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(rank)}</span>` : ''}
+            ${isDealer ? '<span class="dealer-badge dealer-badge--card" title="Current dealer">🃏</span>' : ''}
             <div class="player-avatar" style="background:${ps.player.color}">
               ${ps.player.displayName.charAt(0).toUpperCase()}
             </div>
@@ -263,6 +274,7 @@ export class ActiveMatch {
       return `
         <div class="score-card ${this.rankClass(rank)}" aria-label="${this.escHtml(ps.player.displayName)}: ${ps.total} points">
           ${rank < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(rank)}</span>` : ''}
+          ${isDealer ? '<span class="dealer-badge dealer-badge--card" title="Current dealer">🃏</span>' : ''}
           <div class="player-avatar" style="background:${ps.player.color}">
             ${ps.player.displayName.charAt(0).toUpperCase()}
           </div>
@@ -539,10 +551,14 @@ export class ActiveMatch {
               </button>
             </div>
 
-            ${!isCompleted ? `<div class="current-round-banner" aria-label="Current round">
-              <span class="round-banner-label">Now scoring</span>
-              ${this.escHtml(this.roundLabel(this.currentRound))}
-            </div>` : ''}
+            ${!isCompleted ? (() => {
+              const dealer = dealerId !== null ? this.players.find(p => p.id === dealerId) : null;
+              return `<div class="current-round-banner" aria-label="Current round">
+                <span class="round-banner-label">Now scoring</span>
+                ${this.escHtml(this.roundLabel(this.currentRound))}
+                ${dealer ? `<span class="dealer-pill">🃏 ${this.escHtml(dealer.displayName)}</span>` : ''}
+              </div>`;
+            })() : ''}
 
             <section aria-label="Current scores">
               ${this.tableView

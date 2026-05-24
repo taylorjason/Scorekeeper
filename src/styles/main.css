@@ -1889,11 +1889,100 @@ button, input, select, textarea {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.dealer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  margin-left: 0.25rem;
+}
 @media (min-width: 900px) {
   .current-round-banner {
     font-size: 1.5rem;
     padding: 0 0 0.75rem;
   }
+}
+
+/* ─── Dealer badges ──────────────────────────────────────────────────────────── */
+.dealer-badge {
+  font-size: 0.9em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.dealer-badge--card {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  font-size: 1.1rem;
+}
+.sb-dealer-badge {
+  font-size: 0.6em;
+  vertical-align: middle;
+  margin-left: 0.3em;
+  opacity: 0.9;
+}
+
+/* ─── Configure panel (player order + dealer) ────────────────────────────────── */
+.configure-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.75rem;
+}
+.configure-panel-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.configure-panel-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.configure-player-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  margin-bottom: 0.375rem;
+}
+.configure-player-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+.configure-player-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.configure-player-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+.configure-dealer-btn {
+  font-size: 1rem;
+  opacity: 0.35;
+  transition: opacity 0.15s, background 0.15s;
+}
+.configure-dealer-btn.dealer-selected {
+  opacity: 1;
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: var(--primary);
 }
 
 /* ─── Scoreboard Mode ────────────────────────────────────────────────────────── */

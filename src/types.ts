@@ -10,6 +10,17 @@ export interface Player {
 // Scoring modes for games
 export type ScoringMode = 'high' | 'low' | 'rounds' | 'finish-order' | 'custom' | 'phase10';
 
+// Custom stat field definition — attached to a game
+export type CustomFieldType = 'pick-one' | 'number';
+
+export interface CustomField {
+  id: string;       // slug, unique within game, e.g. "first_out"
+  label: string;    // display name, e.g. "First Out"
+  type: CustomFieldType;
+  scope: 'player' | 'match'; // pick-one is always player
+  trigger: 'per-round' | 'per-match';
+}
+
 // Game represents a board game / card game
 export interface Game {
   id?: number;
@@ -18,6 +29,19 @@ export interface Game {
   rules?: string; // optional notes about rules
   targetScore?: number; // for finish-order or target-based modes
   roundLabels?: string[]; // optional per-round names, e.g. ["Phase 1", "Phase 2", ...]
+  customFields?: CustomField[];
+  createdAt: number;
+}
+
+// CustomStatEntry records a value for one custom field in one match
+export interface CustomStatEntry {
+  id?: number;
+  matchId: number;
+  gameId: number;
+  fieldId: string;
+  playerId?: number;    // undefined for match-scoped fields
+  roundNumber?: number; // undefined for per-match trigger
+  value: number;        // pick-one: 1 for the chosen player; number: the value
   createdAt: number;
 }
 
@@ -93,6 +117,7 @@ export interface AppData {
   gameNights: GameNight[];
   matches: Match[];
   scoreEntries: ScoreEntry[];
+  customStatEntries?: CustomStatEntry[];
   exportedAt: number;
   version: string;
 }

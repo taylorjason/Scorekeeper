@@ -1985,6 +1985,52 @@ button, input, select, textarea {
   color: var(--primary);
 }
 
+/* ─── Custom Stat Fields — Settings form ─────────────────────────────────────── */
+.cfield-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+.cfield-add-row .form-input { flex: 1; min-width: 120px; }
+.cfield-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  margin-bottom: 0.3rem;
+}
+.cfield-row-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex: 1;
+  min-width: 80px;
+}
+
+/* ─── Custom Stat Fields — ActiveMatch round entry ────────────────────────────── */
+.custom-stats-inline {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+}
+.custom-stats-expander {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  font-weight: 500;
+}
+.custom-stats-expander:hover { color: var(--text); }
+
 /* ─── Scoreboard Mode ────────────────────────────────────────────────────────── */
 .scoreboard-mode .app-header,
 .scoreboard-mode .bottom-nav,

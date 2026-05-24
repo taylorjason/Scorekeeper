@@ -10,7 +10,7 @@ import {
   isFirebaseSyncActive, pushNow, pullNow,
 } from '../firebase-sync';
 import { showToast } from '../toast';
-import type { Player, Game, SyncConfig, FirebaseRoomConfig } from '../types';
+import type { Player, Game, SyncConfig, FirebaseRoomConfig, CustomField } from '../types';
 
 const PLAYER_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
@@ -25,6 +25,7 @@ export class Settings {
   private roomConfig: FirebaseRoomConfig | null = null;
   private editingPlayerId: number | null = null;
   private editingGameId: number | null = null;
+  private pendingCustomFields: CustomField[] = [];
 
   async load(): Promise<void> {
     const [players, games] = await Promise.all([getPlayers(), getGames()]);
@@ -442,6 +443,30 @@ export class Settings {
             placeholder="e.g. 10" value="${target}" min="1" />
           <span class="form-hint">Win condition score, if applicable</span>
         </div>
+        <div class="form-group">
+          <label class="form-label">Custom Stat Fields</label>
+          <div id="custom-fields-list">
+            ${this.renderCustomFieldsList()}
+          </div>
+          <div class="cfield-add-row">
+            <input class="form-input" type="text" id="cfield-label"
+              placeholder="Label (e.g. First Out)" maxlength="40" autocomplete="off" />
+            <select class="form-select" id="cfield-type" style="max-width:150px">
+              <option value="pick-one">Pick one player</option>
+              <option value="number">Number</option>
+            </select>
+            <select class="form-select" id="cfield-scope" style="max-width:120px; display:none">
+              <option value="player">Per player</option>
+              <option value="match">Per match</option>
+            </select>
+            <select class="form-select" id="cfield-trigger" style="max-width:115px">
+              <option value="per-round">Per round</option>
+              <option value="per-match">Per match</option>
+            </select>
+            <button type="button" class="btn btn-secondary btn-sm" id="add-cfield-btn">+ Add</button>
+          </div>
+          <span class="form-hint">Track extra stats per round or per match — e.g. who went out first.</span>
+        </div>
         <div class="btn-group">
           <button type="submit" class="btn btn-primary flex-1" id="save-game-btn">
             ${game ? 'Update Game' : 'Add Game'}
@@ -450,6 +475,65 @@ export class Settings {
         </div>
       </form>
     `;
+  }
+
+  private renderCustomFieldsList(): string {
+    if (this.pendingCustomFields.length === 0) {
+      return '<p class="text-xs text-muted" style="margin:0.25rem 0 0.5rem">No custom fields yet.</p>';
+    }
+    return this.pendingCustomFields.map((f, i) => `
+      <div class="cfield-row">
+        <span class="cfield-row-label">${this.escHtml(f.label)}</span>
+        <span class="badge badge-secondary">${f.type === 'pick-one' ? 'Pick one' : 'Number'}</span>
+        <span class="badge badge-secondary">${f.scope === 'player' ? 'per player' : 'per match'}</span>
+        <span class="badge badge-secondary">${f.trigger === 'per-round' ? 'per round' : 'per match'}</span>
+        <button type="button" class="btn btn-icon btn-sm remove-cfield-btn" data-index="${i}" aria-label="Remove field">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  private makeFieldId(label: string): string {
+    const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'field';
+    if (!this.pendingCustomFields.find(f => f.id === base)) return base;
+    let n = 2;
+    while (this.pendingCustomFields.find(f => f.id === `${base}_${n}`)) n++;
+    return `${base}_${n}`;
+  }
+
+  private bindCustomFieldsButtons(): void {
+    const typeEl = document.getElementById('cfield-type') as HTMLSelectElement | null;
+    const scopeEl = document.getElementById('cfield-scope') as HTMLSelectElement | null;
+    const updateScopeVisibility = () => {
+      if (scopeEl) scopeEl.style.display = typeEl?.value === 'pick-one' ? 'none' : '';
+    };
+    updateScopeVisibility();
+    typeEl?.addEventListener('change', updateScopeVisibility);
+
+    document.getElementById('add-cfield-btn')?.addEventListener('click', () => {
+      const labelEl = document.getElementById('cfield-label') as HTMLInputElement | null;
+      const label = labelEl?.value.trim() ?? '';
+      if (!label) { showToast('Enter a field label', 'error'); return; }
+      const type = (typeEl?.value ?? 'pick-one') as CustomField['type'];
+      const scope: CustomField['scope'] = type === 'pick-one' ? 'player' : ((scopeEl?.value ?? 'player') as CustomField['scope']);
+      const trigger = ((document.getElementById('cfield-trigger') as HTMLSelectElement)?.value ?? 'per-round') as CustomField['trigger'];
+      this.pendingCustomFields.push({ id: this.makeFieldId(label), label, type, scope, trigger });
+      const listEl = document.getElementById('custom-fields-list');
+      if (listEl) listEl.innerHTML = this.renderCustomFieldsList();
+      if (labelEl) labelEl.value = '';
+      this.bindCustomFieldsButtons();
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.remove-cfield-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt((e.currentTarget as HTMLElement).dataset['index'] ?? '0', 10);
+        this.pendingCustomFields.splice(idx, 1);
+        const listEl = document.getElementById('custom-fields-list');
+        if (listEl) listEl.innerHTML = this.renderCustomFieldsList();
+        this.bindCustomFieldsButtons();
+      });
+    });
   }
 
   afterRender(): void {
@@ -733,10 +817,12 @@ export class Settings {
         const game = this.games.find(g => g.id === gid);
         const container = document.getElementById('add-game-form-container');
         if (container && game) {
+          this.pendingCustomFields = [...(game.customFields ?? [])];
           container.innerHTML = `<h3 class="card-title mb-3">Edit Game</h3>${this.renderGameForm(game)}`;
           this.bindGameFormSubmit();
           document.getElementById('cancel-edit-game-btn')?.addEventListener('click', () => {
             this.editingGameId = null;
+            this.pendingCustomFields = [];
             container.innerHTML = `<h3 class="card-title mb-3">Add Game</h3>${this.renderGameForm()}`;
             this.bindGameFormSubmit();
           });
@@ -795,12 +881,17 @@ export class Settings {
         .map(l => l.trim())
         .filter(l => l.length > 0);
 
+      const customFields = this.pendingCustomFields.length > 0
+        ? [...this.pendingCustomFields]
+        : undefined;
+
       const gameData = {
         name,
         scoringMode: modeInput.value as Game['scoringMode'],
         rules: rulesInput.value.trim() || undefined,
         targetScore: targetInput.value ? parseInt(targetInput.value, 10) : undefined,
         roundLabels: roundLabels.length > 0 ? roundLabels : undefined,
+        customFields,
         createdAt: Date.now(),
       };
 
@@ -812,6 +903,7 @@ export class Settings {
             rules: gameData.rules,
             targetScore: gameData.targetScore,
             roundLabels: gameData.roundLabels,
+            customFields: gameData.customFields,
           });
           showToast('Game updated', 'success');
         } else {
@@ -821,6 +913,7 @@ export class Settings {
 
         this.games = await getGames();
         this.editingGameId = null;
+        this.pendingCustomFields = [];
         const listEl = document.getElementById('games-list');
         if (listEl) listEl.innerHTML = this.renderGamesList();
         const container = document.getElementById('add-game-form-container');
@@ -834,6 +927,8 @@ export class Settings {
         showToast('Failed to save game', 'error');
       }
     });
+
+    this.bindCustomFieldsButtons();
   }
 
   private bindSyncForm(): void {

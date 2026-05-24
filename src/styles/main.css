@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&display=swap');
+
 /* ─── CSS Custom Properties ─────────────────────────────────────────────────── */
 :root {
   --primary: #6366f1;
@@ -2143,6 +2145,7 @@ button, input, select, textarea {
   padding: env(safe-area-inset-top, 1rem) env(safe-area-inset-right, 1rem) env(safe-area-inset-bottom, 1rem) env(safe-area-inset-left, 1rem);
   text-align: center;
   overflow: hidden;
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .rd-close {
@@ -2168,8 +2171,8 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(0.75rem, 3vw, 1.5rem);
-  padding: 1rem;
+  gap: 0.105rem;
+  padding: 0;
   max-width: 90vw;
 }
 
@@ -2182,7 +2185,7 @@ button, input, select, textarea {
 }
 
 .rd-headline {
-  font-size: clamp(10.5rem, 54vw, 21rem);
+  font-size: clamp(15rem, 80vw, 35rem);
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -2196,16 +2199,10 @@ button, input, select, textarea {
   color: rgba(255,255,255,0.5);
 }
 
-.rd-subline {
-  font-size: clamp(2rem, 9vw, 3.5rem);
-  font-weight: 500;
-  color: rgba(255,255,255,0.55);
-  letter-spacing: -0.01em;
-}
 
 .rd-updated {
   font-size: clamp(0.65rem, 2.5vw, 0.85rem);
-  color: rgba(255,255,255,0.25);
+  color: rgba(255, 255, 255, 0.591);
   margin-top: clamp(1rem, 5vw, 2rem);
 }
 

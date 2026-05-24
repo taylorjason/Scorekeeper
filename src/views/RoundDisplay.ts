@@ -63,7 +63,7 @@ export class RoundDisplay {
     }
 
     const isCompleted = this.match.status === 'completed';
-    const { headline, subline } = this._getDisplay();
+    const { headline } = this._getDisplay();
 
     return `
       <div class="rd-screen">
@@ -73,7 +73,6 @@ export class RoundDisplay {
           <div class="rd-headline" id="rd-headline">
             ${isCompleted ? 'Game Over' : this._esc(headline)}
           </div>
-          ${subline && !isCompleted ? `<div class="rd-subline" id="rd-subline">${this._esc(subline)}</div>` : ''}
           <div class="rd-updated" id="rd-updated">Updated ${this.lastUpdated.toLocaleTimeString()}</div>
         </div>
       </div>`;
@@ -98,11 +97,9 @@ export class RoundDisplay {
   }
 
   private _patch(): void {
-    const { headline, subline } = this._getDisplay();
+    const { headline } = this._getDisplay();
     const headlineEl = document.getElementById('rd-headline');
     if (headlineEl) headlineEl.textContent = headline;
-    const sublineEl = document.getElementById('rd-subline');
-    if (sublineEl) sublineEl.textContent = subline;
     const updEl = document.getElementById('rd-updated');
     if (updEl) updEl.textContent = `Updated ${this.lastUpdated.toLocaleTimeString()}`;
   }

@@ -319,7 +319,17 @@ export class Scoreboard {
 
   private _patch(): void {
     const playersEl = document.getElementById('sb-players');
-    if (playersEl) playersEl.innerHTML = this._view === 'cards' ? this._renderCards() : this._renderTableView();
+    if (playersEl) {
+      const scroller = document.querySelector('.main-content') as HTMLElement | null;
+      const savedScrollTop = scroller?.scrollTop ?? 0;
+      const savedScrollLeft = (playersEl.querySelector('.sbt-wrap') as HTMLElement | null)?.scrollLeft ?? 0;
+
+      playersEl.innerHTML = this._view === 'cards' ? this._renderCards() : this._renderTableView();
+
+      if (scroller) scroller.scrollTop = savedScrollTop;
+      const newWrap = playersEl.querySelector('.sbt-wrap') as HTMLElement | null;
+      if (newWrap) newWrap.scrollLeft = savedScrollLeft;
+    }
 
     // Sync view toggle button active states
     document.getElementById('sb-view-cards')?.classList.toggle('sb-view-btn--active', this._view === 'cards');

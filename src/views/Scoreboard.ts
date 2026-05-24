@@ -102,13 +102,19 @@ export class Scoreboard {
 
   private _currentRoundBannerText(): string {
     const isPhase10 = this.game?.scoringMode === 'phase10';
-    if (this.currentRound === 0) {
-      return isPhase10 ? 'Hand 1' : this._roundLabel(1);
-    }
+    const isCompleted = this.match?.status === 'completed';
+
     if (isPhase10) {
-      return `${this.currentRound} Hand${this.currentRound !== 1 ? 's' : ''} Played`;
+      // completed: show total hands played; active: show hand currently being played
+      return isCompleted
+        ? `${this.currentRound} Hand${this.currentRound !== 1 ? 's' : ''} Played`
+        : `Hand ${this.currentRound + 1}`;
     }
-    return this._roundLabel(this.currentRound);
+
+    // For regular games: show the round currently being played (last scored + 1),
+    // or last scored when match is complete.
+    const activeRound = isCompleted ? this.currentRound : this.currentRound + 1;
+    return this._roundLabel(activeRound);
   }
 
   private _renderCards(): string {

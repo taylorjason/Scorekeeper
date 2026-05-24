@@ -15,6 +15,7 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
   _viewTeardown = null;
 
   document.body.classList.toggle('scoreboard-mode', parsed.route === 'scoreboard');
+  document.body.classList.toggle('round-display-mode', parsed.route === 'round-display');
 
   const container = document.getElementById('view-container');
   if (!container) return;
@@ -80,6 +81,15 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
       _viewTeardown = () => view.teardown();
       break;
     }
+    case 'round-display': {
+      const { RoundDisplay } = await import('./views/RoundDisplay');
+      const view = new RoundDisplay();
+      await view.load(Number(parsed.params.id));
+      container.innerHTML = view.render();
+      view.afterRender();
+      _viewTeardown = () => view.teardown();
+      break;
+    }
   }
   } catch (err) {
     console.error('View load error:', err);
@@ -124,9 +134,14 @@ function renderAppShell(): void {
     </footer>
 
     <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
-      <div class="sidebar-brand" aria-hidden="true">
+      <div class="sidebar-brand">
         <span class="sidebar-brand-icon">🎲</span>
         <span class="sidebar-brand-name">Scorekeeper</span>
+        <button class="sidebar-toggle-btn" id="sidebar-toggle" aria-label="Collapse sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
       </div>
       <button class="nav-item" data-route="dashboard" aria-label="Dashboard">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -182,6 +197,19 @@ function renderAppShell(): void {
     html.setAttribute('data-theme', next);
     localStorage.setItem('scorekeeper_theme', next);
     showToast(`Switched to ${next} mode`, 'info');
+  });
+
+  const savedCollapsed = localStorage.getItem('scorekeeper_sidebar_collapsed') === 'true';
+  if (savedCollapsed) document.body.classList.add('sidebar-collapsed');
+
+  const toggleSidebar = () => {
+    const collapsed = document.body.classList.toggle('sidebar-collapsed');
+    localStorage.setItem('scorekeeper_sidebar_collapsed', String(collapsed));
+  };
+  document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
+  // clicking the brand icon when collapsed expands the sidebar
+  document.querySelector('.sidebar-brand-icon')?.addEventListener('click', () => {
+    if (document.body.classList.contains('sidebar-collapsed')) toggleSidebar();
   });
 }
 

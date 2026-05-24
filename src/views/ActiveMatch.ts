@@ -163,9 +163,10 @@ export class ActiveMatch {
     if (fields.length === 0) return '';
 
     const inputsHtml = fields.map(f => {
+      const iconPrefix = f.icon ? `${f.icon} ` : '';
       if (f.type === 'pick-one') {
         return `<div class="form-group" style="margin-top:0.75rem">
-          <label class="form-label" style="font-size:0.8rem">${this.escHtml(f.label)} <span class="text-muted">(optional)</span></label>
+          <label class="form-label" style="font-size:0.8rem">${iconPrefix}${this.escHtml(f.label)} <span class="text-muted">(optional)</span></label>
           <select class="form-select" id="cstat-${f.id}" data-field-id="${f.id}" style="min-height:38px">
             <option value="">— none —</option>
             ${this.players.map(p => `<option value="${p.id}">${this.escHtml(p.displayName)}</option>`).join('')}
@@ -174,7 +175,7 @@ export class ActiveMatch {
       }
       if (f.scope === 'player') {
         return `<div class="form-group" style="margin-top:0.75rem">
-          <label class="form-label" style="font-size:0.8rem">${this.escHtml(f.label)}</label>
+          <label class="form-label" style="font-size:0.8rem">${iconPrefix}${this.escHtml(f.label)}</label>
           <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.25rem">
             ${this.players.map(p => `
               <div style="display:flex; flex-direction:column; align-items:center; gap:2px">
@@ -187,7 +188,7 @@ export class ActiveMatch {
         </div>`;
       }
       return `<div class="form-group" style="margin-top:0.75rem">
-        <label class="form-label" style="font-size:0.8rem">${this.escHtml(f.label)}</label>
+        <label class="form-label" style="font-size:0.8rem">${iconPrefix}${this.escHtml(f.label)}</label>
         <input class="form-input" type="number" id="cstat-${f.id}"
           data-field-id="${f.id}" placeholder="0" step="1" style="max-width:120px" />
       </div>`;
@@ -259,19 +260,20 @@ export class ActiveMatch {
         const entry = roundEntries.find(e => e.playerId === p.id);
         if (!entry) return `<td class="score-table-score">–</td>`;
         const editAttrs = `data-entry-id="${entry.id}" data-player-id="${p.id}" data-round="${rn}"`;
-        const isFirstOut = this.customStats.some(s =>
-          s.fieldId === 'first_out' && s.playerId === p.id && s.roundNumber === rn
-        );
+        const statIcons = (this.game?.customFields ?? [])
+          .filter(f => f.trigger === 'per-round' && f.icon)
+          .filter(f => this.customStats.some(s => s.fieldId === f.id && s.playerId === p.id && s.roundNumber === rn))
+          .map(f => f.icon!)
+          .join('');
         if (isPhase10) {
           try {
             const data = JSON.parse(entry.note ?? '{}') as { phase?: number; completed?: boolean };
             const phaseLabel = data.phase ? `Ph.${data.phase}` : '';
             const completedMark = data.completed ? ' ✓' : '';
-            const foMark = isFirstOut ? ' ⚡' : '';
-            return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
+            return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${statIcons ? ' ' + statIcons : ''}<br><small>${entry.value}pts</small></td>`;
           } catch { /* fall through */ }
         }
-        return `<td class="score-table-score score-cell-editable" ${editAttrs}>${isFirstOut ? '⚡ ' : ''}${entry.value}</td>`;
+        return `<td class="score-table-score score-cell-editable" ${editAttrs}>${statIcons ? statIcons + ' ' : ''}${entry.value}</td>`;
       }).join('');
 
       const runCells = this.players.map(p => {

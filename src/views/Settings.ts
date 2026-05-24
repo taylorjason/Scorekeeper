@@ -18,6 +18,14 @@ const PLAYER_COLORS = [
   '#8b5cf6', '#ec4899', '#64748b', '#d97706',
 ];
 
+const STAT_EMOJIS = [
+  '⚡','🎯','🏆','🥇','🎲','🃏','🌟','🔥','❄️','🚀',
+  '💣','👑','💎','🏅','🎉','⭐','💫','✨','💥','🎁',
+  '⏱️','⚔️','🛡️','💰','🔑','💪','👀','😎','🤩','👍',
+  '👎','👋','🦁','🐉','🌈','☀️','🌙','🎭','🏹','🥊',
+  '🎮','🕹️','🧠','🤔','🦊','🐺','🎪','🔮','🪄','🎰',
+];
+
 export class Settings {
   private players: Player[] = [];
   private games: Game[] = [];
@@ -26,6 +34,8 @@ export class Settings {
   private editingPlayerId: number | null = null;
   private editingGameId: number | null = null;
   private pendingCustomFields: CustomField[] = [];
+  private pendingFieldIcon = '';
+  private iconPickerOpen = false;
 
   async load(): Promise<void> {
     const [players, games] = await Promise.all([getPlayers(), getGames()]);
@@ -449,8 +459,15 @@ export class Settings {
             ${this.renderCustomFieldsList()}
           </div>
           <div class="cfield-add-row">
+            <div class="icon-picker-wrap" style="position:relative">
+              <button type="button" class="icon-picker-btn" id="icon-picker-toggle" title="Pick an icon" aria-label="Pick icon" aria-expanded="${this.iconPickerOpen}">${this.pendingFieldIcon || '＋'}</button>
+              <div id="icon-picker-grid" class="icon-picker-grid" style="${this.iconPickerOpen ? '' : 'display:none'}">
+                <button type="button" class="emoji-opt emoji-opt--clear" data-emoji="">✕</button>
+                ${STAT_EMOJIS.map(e => `<button type="button" class="emoji-opt${this.pendingFieldIcon === e ? ' emoji-opt--selected' : ''}" data-emoji="${e}">${e}</button>`).join('')}
+              </div>
+            </div>
             <input class="form-input" type="text" id="cfield-label"
-              placeholder="Label (e.g. First Out)" maxlength="40" autocomplete="off" />
+              placeholder="Label (e.g. First Out)" maxlength="40" autocomplete="off" style="flex:1; min-width:100px" />
             <select class="form-select" id="cfield-type" style="max-width:150px">
               <option value="pick-one">Pick one player</option>
               <option value="number">Number</option>
@@ -483,6 +500,7 @@ export class Settings {
     }
     return this.pendingCustomFields.map((f, i) => `
       <div class="cfield-row">
+        ${f.icon ? `<span class="cfield-row-icon">${f.icon}</span>` : ''}
         <span class="cfield-row-label">${this.escHtml(f.label)}</span>
         <span class="badge badge-secondary">${f.type === 'pick-one' ? 'Pick one' : 'Number'}</span>
         <span class="badge badge-secondary">${f.scope === 'player' ? 'per player' : 'per match'}</span>
@@ -502,6 +520,14 @@ export class Settings {
     return `${base}_${n}`;
   }
 
+  private _refreshIconPickerBtn(): void {
+    const btn = document.getElementById('icon-picker-toggle');
+    if (btn) btn.textContent = this.pendingFieldIcon || '＋';
+    document.querySelectorAll<HTMLButtonElement>('.emoji-opt').forEach(b => {
+      b.classList.toggle('emoji-opt--selected', b.dataset['emoji'] === this.pendingFieldIcon && this.pendingFieldIcon !== '');
+    });
+  }
+
   private bindCustomFieldsButtons(): void {
     const typeEl = document.getElementById('cfield-type') as HTMLSelectElement | null;
     const scopeEl = document.getElementById('cfield-scope') as HTMLSelectElement | null;
@@ -511,6 +537,37 @@ export class Settings {
     updateScopeVisibility();
     typeEl?.addEventListener('change', updateScopeVisibility);
 
+    // Icon picker toggle
+    document.getElementById('icon-picker-toggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.iconPickerOpen = !this.iconPickerOpen;
+      const grid = document.getElementById('icon-picker-grid');
+      if (grid) grid.style.display = this.iconPickerOpen ? '' : 'none';
+      const btn = document.getElementById('icon-picker-toggle');
+      if (btn) btn.setAttribute('aria-expanded', String(this.iconPickerOpen));
+    });
+
+    // Close picker when clicking outside
+    const closePickerOnOutside = (e: MouseEvent) => {
+      if (!(e.target as Element).closest('.icon-picker-wrap')) {
+        this.iconPickerOpen = false;
+        const grid = document.getElementById('icon-picker-grid');
+        if (grid) grid.style.display = 'none';
+      }
+    };
+    document.addEventListener('click', closePickerOnOutside);
+
+    document.querySelectorAll<HTMLButtonElement>('.emoji-opt').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.pendingFieldIcon = btn.dataset['emoji'] ?? '';
+        this.iconPickerOpen = false;
+        const grid = document.getElementById('icon-picker-grid');
+        if (grid) grid.style.display = 'none';
+        this._refreshIconPickerBtn();
+      });
+    });
+
     document.getElementById('add-cfield-btn')?.addEventListener('click', () => {
       const labelEl = document.getElementById('cfield-label') as HTMLInputElement | null;
       const label = labelEl?.value.trim() ?? '';
@@ -518,10 +575,13 @@ export class Settings {
       const type = (typeEl?.value ?? 'pick-one') as CustomField['type'];
       const scope: CustomField['scope'] = type === 'pick-one' ? 'player' : ((scopeEl?.value ?? 'player') as CustomField['scope']);
       const trigger = ((document.getElementById('cfield-trigger') as HTMLSelectElement)?.value ?? 'per-round') as CustomField['trigger'];
-      this.pendingCustomFields.push({ id: this.makeFieldId(label), label, type, scope, trigger });
+      const icon = this.pendingFieldIcon || undefined;
+      this.pendingCustomFields.push({ id: this.makeFieldId(label), label, type, scope, trigger, ...(icon ? { icon } : {}) });
       const listEl = document.getElementById('custom-fields-list');
       if (listEl) listEl.innerHTML = this.renderCustomFieldsList();
       if (labelEl) labelEl.value = '';
+      this.pendingFieldIcon = '';
+      this.iconPickerOpen = false;
       this.bindCustomFieldsButtons();
     });
 
@@ -823,6 +883,8 @@ export class Settings {
           document.getElementById('cancel-edit-game-btn')?.addEventListener('click', () => {
             this.editingGameId = null;
             this.pendingCustomFields = [];
+            this.pendingFieldIcon = '';
+            this.iconPickerOpen = false;
             container.innerHTML = `<h3 class="card-title mb-3">Add Game</h3>${this.renderGameForm()}`;
             this.bindGameFormSubmit();
           });
@@ -914,6 +976,8 @@ export class Settings {
         this.games = await getGames();
         this.editingGameId = null;
         this.pendingCustomFields = [];
+        this.pendingFieldIcon = '';
+        this.iconPickerOpen = false;
         const listEl = document.getElementById('games-list');
         if (listEl) listEl.innerHTML = this.renderGamesList();
         const container = document.getElementById('add-game-form-container');

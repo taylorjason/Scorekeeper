@@ -19,6 +19,7 @@ export interface CustomField {
   type: CustomFieldType;
   scope: 'player' | 'match'; // pick-one is always player
   trigger: 'per-round' | 'per-match';
+  icon?: string;    // emoji shown in table cells, e.g. "⚡"
 }
 
 // Game represents a board game / card game

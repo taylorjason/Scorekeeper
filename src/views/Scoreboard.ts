@@ -101,8 +101,10 @@ export class Scoreboard {
   }
 
   private _currentRoundBannerText(): string {
-    if (this.currentRound === 0) return '';
     const isPhase10 = this.game?.scoringMode === 'phase10';
+    if (this.currentRound === 0) {
+      return isPhase10 ? 'Hand 1' : this._roundLabel(1);
+    }
     if (isPhase10) {
       return `${this.currentRound} Hand${this.currentRound !== 1 ? 's' : ''} Played`;
     }

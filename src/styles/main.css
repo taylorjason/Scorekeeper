@@ -2174,7 +2174,7 @@ button, input, select, textarea {
 }
 
 .rd-game-name {
-  font-size: clamp(0.9rem, 3.5vw, 1.25rem);
+  font-size: clamp(1.35rem, 5.5vw, 2rem);
   font-weight: 600;
   color: rgba(255,255,255,0.45);
   text-transform: uppercase;
@@ -2182,12 +2182,14 @@ button, input, select, textarea {
 }
 
 .rd-headline {
-  font-size: clamp(3.5rem, 18vw, 7rem);
+  font-size: clamp(10.5rem, 54vw, 21rem);
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.03em;
   color: #fff;
   text-shadow: 0 4px 32px rgba(99,102,241,0.4);
+  word-break: break-word;
+  white-space: normal;
 }
 
 .rd-done {
@@ -2195,7 +2197,7 @@ button, input, select, textarea {
 }
 
 .rd-subline {
-  font-size: clamp(1rem, 4.5vw, 1.75rem);
+  font-size: clamp(2rem, 9vw, 3.5rem);
   font-weight: 500;
   color: rgba(255,255,255,0.55);
   letter-spacing: -0.01em;

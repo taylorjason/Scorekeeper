@@ -1,0 +1,11 @@
+import{P as e,a as t,b as n,i as r,j as i,p as a}from"./index-3xWVDVA5.js";var o=class{matchId=0;match=null;game=null;maxRound=0;lastUpdated=new Date;_pollInterval=null;async load(e){this.matchId=e,await this._fetchData()}async _fetchData(){if(this.match=await i(this.matchId)??null,!this.match)return;let[t,r]=await Promise.all([n.games.get(this.match.gameId),e(this.matchId)]);this.game=t??null,this.maxRound=r.length>0?Math.max(...r.map(e=>e.roundNumber)):0,this.lastUpdated=new Date}_roundLabel(e){let t=this.game?.roundLabels;return t&&t.length>=e?t[e-1]:`Round ${e}`}_getDisplay(){let e=this.game?.scoringMode===`phase10`,t=this.maxRound+1;return e?this.maxRound===0?{headline:`Hand 1`,subline:`Game starting`}:{headline:`${this.maxRound} Hand${this.maxRound===1?``:`s`} Played`,subline:`Hand ${t} up next`}:{headline:this._roundLabel(t),subline:this.game?.name??``}}_esc(e){return e.replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`)}render(){if(!this.match||!this.game)return`<div class="rd-screen"><p class="rd-error">Match not found</p></div>`;let e=this.match.status===`completed`,{headline:t}=this._getDisplay();return`
+      <div class="rd-screen">
+        <button class="rd-close" id="rd-close" aria-label="Close">✕</button>
+        <div class="rd-inner">
+          <div class="rd-game-name">${this._esc(this.game.name)}</div>
+          <div class="rd-headline" id="rd-headline">
+            ${e?`Game Over`:this._esc(t)}
+          </div>
+          <div class="rd-updated" id="rd-updated">Updated ${this.lastUpdated.toLocaleTimeString()}</div>
+        </div>
+      </div>`}afterRender(){document.getElementById(`rd-close`)?.addEventListener(`click`,()=>{window.history.length>1?window.history.back():a(`dashboard`)}),this._pollInterval=setInterval(()=>{this._fetchData().then(()=>this._patch()).catch(()=>{})},5e3);let e=r();e&&t(e,()=>{this._fetchData().then(()=>this._patch()).catch(()=>{})}).catch(()=>{})}_patch(){let{headline:e}=this._getDisplay(),t=document.getElementById(`rd-headline`);t&&(t.textContent=e);let n=document.getElementById(`rd-updated`);n&&(n.textContent=`Updated ${this.lastUpdated.toLocaleTimeString()}`)}teardown(){this._pollInterval&&=(clearInterval(this._pollInterval),null)}};export{o as RoundDisplay};

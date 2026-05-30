@@ -5,7 +5,7 @@ import {
 import { navigate } from '../router';
 import { showToast } from '../toast';
 import { escHtml } from '../utils';
-import type { GameNight, Match, Player, Game } from '../types';
+import type { GameNight, Match, Player, Game, ScoreEntry } from '../types';
 
 interface NightWithMatches {
   night: GameNight;
@@ -18,6 +18,7 @@ interface MatchDetails {
   players: Player[];
   winner: Player | undefined;
   playerTotals: { player: Player; total: number }[];
+  entries: ScoreEntry[];
 }
 
 export class History {
@@ -62,7 +63,7 @@ export class History {
               playerTotals.sort((a, b) => b.total - a.total);
             }
 
-            return { match, game, players: matchPlayers, winner, playerTotals };
+            return { match, game, players: matchPlayers, winner, playerTotals, entries };
           })
         );
         return { night, matches: matchDetails };
@@ -209,18 +210,82 @@ export class History {
       </div>
     `).join('');
 
+    const hasRounds = md.entries.length > 0;
+    const maxRound = hasRounds ? Math.max(...md.entries.map(e => e.roundNumber)) : 0;
+
     return `
       <div class="match-result">
         <div class="match-result-title">
           ${md.game ? escHtml(md.game.name) : 'Unknown Game'}
           ${statusBadge}
           ${md.winner ? `<span class="winner-label">🏆 ${escHtml(md.winner.displayName)}</span>` : ''}
+          ${hasRounds ? `<button class="btn btn-sm btn-secondary view-scores-btn" data-match-id="${md.match.id}" style="margin-left:auto;font-size:0.7rem;padding:2px 8px">📊 ${maxRound} round${maxRound !== 1 ? 's' : ''}</button>` : ''}
         </div>
         <div style="padding-left: 0.25rem">
           ${scoresHtml}
         </div>
       </div>
     `;
+  }
+
+  private showScoreTableModal(matchId: number): void {
+    const md = this.nights.flatMap(n => n.matches).find(m => m.match.id === matchId);
+    if (!md) return;
+
+    const rounds = [...new Set(md.entries.map(e => e.roundNumber))].sort((a, b) => a - b);
+    const labels = md.game?.roundLabels;
+
+    const headerCells = rounds.map(r =>
+      `<th>${labels?.[r - 1] ? escHtml(labels[r - 1]) : `R${r}`}</th>`
+    ).join('');
+
+    const bodyRows = md.playerTotals.map(({ player, total }, i) => {
+      const roundCells = rounds.map(r => {
+        const entry = md.entries.find(e => e.playerId === player.id && e.roundNumber === r);
+        return `<td class="score-table-score">${entry !== undefined ? entry.value : '—'}</td>`;
+      }).join('');
+      return `
+        <tr class="${i === 0 && md.match.status === 'completed' ? 'score-table-total-row' : ''}">
+          <td class="score-table-label">
+            <span class="player-dot" style="background:${player.color}"></span>
+            ${i === 0 && md.match.status === 'completed' ? '🏆 ' : ''}${escHtml(player.displayName)}
+          </td>
+          ${roundCells}
+          <td class="score-table-label-total">${total}</td>
+        </tr>`;
+    }).join('');
+
+    const modal = document.createElement('div');
+    modal.id = 'score-table-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Score Table');
+    modal.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h2 class="modal-title">${md.game ? escHtml(md.game.name) : 'Score Table'}</h2>
+          <button class="icon-btn modal-close-btn" aria-label="Close">✕</button>
+        </div>
+        <div class="score-table-wrapper" style="overflow-x:auto;max-height:60vh;overflow-y:auto">
+          <table class="score-table">
+            <thead>
+              <tr>
+                <th class="score-table-corner">Player</th>
+                ${headerCells}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>${bodyRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.querySelectorAll('.modal-close-btn, .modal-backdrop').forEach(el => {
+      el.addEventListener('click', () => modal.remove());
+    });
   }
 
   private showAddMatchModal(nightId: number): void {
@@ -381,6 +446,16 @@ export class History {
         e.stopPropagation();
         const nightId = parseInt((e.currentTarget as HTMLElement).dataset['nightId'] ?? '', 10);
         this.showAddMatchModal(nightId);
+      });
+    });
+
+    // View score table buttons
+    document.querySelectorAll('.view-scores-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const matchId = parseInt((e.currentTarget as HTMLElement).dataset['matchId'] ?? '', 10);
+        document.getElementById('score-table-modal')?.remove();
+        this.showScoreTableModal(matchId);
       });
     });
 

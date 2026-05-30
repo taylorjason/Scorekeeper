@@ -135,6 +135,14 @@ export async function updateMatch(id: number, changes: Partial<Match>): Promise<
   notifyChange();
 }
 
+export async function reopenMatch(id: number): Promise<void> {
+  await db.matches.where('id').equals(id).modify((m: Match) => {
+    m.status = 'active';
+    delete (m as Partial<Match>).winnerId;
+  });
+  notifyChange();
+}
+
 export async function getMatch(id: number): Promise<Match | undefined> {
   return db.matches.get(id);
 }

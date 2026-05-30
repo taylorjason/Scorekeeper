@@ -1,6 +1,6 @@
 import {
   getGameNights, getMatchesForNight, getScoreEntriesForMatch,
-  deleteGameNight, createMatch, db
+  deleteGameNight, createMatch, reopenMatch, db
 } from '../db';
 import { navigate } from '../router';
 import { showToast } from '../toast';
@@ -270,13 +270,17 @@ export class History {
     const hasRounds = md.entries.length > 0;
     const maxRound = hasRounds ? Math.max(...md.entries.map(e => e.roundNumber)) : 0;
 
+    const isCompleted = md.match.status === 'completed';
     return `
       <div class="match-result">
         <div class="match-result-title">
           ${md.game ? escHtml(md.game.name) : 'Unknown Game'}
           ${statusBadge}
           ${md.winner ? `<span class="winner-label">🏆 ${escHtml(md.winner.displayName)}</span>` : ''}
-          ${hasRounds ? `<button class="btn btn-sm btn-secondary view-scores-btn" data-match-id="${md.match.id}" style="margin-left:auto;font-size:0.7rem;padding:2px 8px">📊 ${maxRound} round${maxRound !== 1 ? 's' : ''}</button>` : ''}
+          <span style="margin-left:auto;display:flex;gap:0.35rem;align-items:center">
+            ${hasRounds ? `<button class="btn btn-sm btn-secondary view-scores-btn" data-match-id="${md.match.id}" style="font-size:0.7rem;padding:2px 8px">📊 ${maxRound} round${maxRound !== 1 ? 's' : ''}</button>` : ''}
+            ${isCompleted ? `<button class="btn btn-sm btn-secondary reopen-match-btn" data-match-id="${md.match.id}" style="font-size:0.7rem;padding:2px 8px">↩ Re-open</button>` : ''}
+          </span>
         </div>
         <div style="padding-left: 0.25rem">
           ${scoresHtml}
@@ -613,6 +617,22 @@ export class History {
         e.stopPropagation();
         const matchId = (e.currentTarget as HTMLElement).dataset['matchId'];
         if (matchId) navigate('match', { id: matchId });
+      });
+    });
+
+    // Re-open completed match
+    document.querySelectorAll('.reopen-match-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const matchId = parseInt((e.currentTarget as HTMLElement).dataset['matchId'] ?? '', 10);
+        if (isNaN(matchId)) return;
+        try {
+          await reopenMatch(matchId);
+          navigate('match', { id: String(matchId) });
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to re-open match', 'error');
+        }
       });
     });
   }

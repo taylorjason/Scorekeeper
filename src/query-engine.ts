@@ -176,8 +176,8 @@ export function runQuery(rows: StatRow[], query: StatQuery): StatResult[] {
     switch (query.field) {
       case 'value':        rawValue = r.value; break;
       case 'roundDuration': rawValue = r.roundDuration; break;
-      case 'isFirstOut':   rawValue = r.isFirstOut ? 1 : 0; break;
-      case 'isWin':        rawValue = r.isWinner ? 1 : 0; break;
+      case 'isFirstOut':   rawValue = r.isFirstOut ? 1 : undefined; break;
+      case 'isWin':        rawValue = r.isWinner ? 1 : undefined; break;
     }
     if (rawValue === undefined) continue;
 

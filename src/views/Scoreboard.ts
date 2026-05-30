@@ -315,14 +315,13 @@ export class Scoreboard {
             <div class="sb-game-name">${escHtml(this.game.name)}</div>
             <div class="sb-night-name" id="sb-night-name">${escHtml(this.night.title)} · ${roundText}</div>
           </div>
+          ${roundBannerText ? `<div class="sb-header-center"><div class="sb-round-inline" id="sb-round-banner">${escHtml(roundBannerText)}</div></div>` : ''}
           <div class="sb-header-right">
             ${viewToggle}
             ${statusBadge}
             <button class="sb-close" id="sb-close" aria-label="Close scoreboard">✕</button>
           </div>
         </div>
-
-        ${roundBannerText ? `<div class="sb-round-banner" id="sb-round-banner">${escHtml(roundBannerText)}</div>` : ''}
 
         <div class="sb-players" id="sb-players">
           ${cardsActive ? this._renderCards() : this._renderTableView()}

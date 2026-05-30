@@ -2248,7 +2248,17 @@ button, input, select, textarea {
   margin-bottom: 0.25rem;
 }
 .sb-header-left { flex: 1; min-width: 0; }
+.sb-header-center { flex: 0 1 auto; display: flex; align-items: center; justify-content: center; padding: 0 1rem; }
 .sb-header-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+
+.sb-round-inline {
+  font-size: clamp(1.75rem, 4.5vw, 3.5rem);
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
 
 .sb-game-name {
   font-size: clamp(1.25rem, 3vw, 2rem);
@@ -2321,19 +2331,19 @@ button, input, select, textarea {
 .sb-player {
   background: linear-gradient(to right, color-mix(in srgb, var(--pc, #6366f1) 10%, #111827) 0%, #111827 45%);
   border-radius: 16px;
-  padding: clamp(1.1rem, 2.5vw, 2rem) clamp(1.25rem, 3vw, 2.5rem);
+  padding: clamp(1.32rem, 3vw, 2.4rem) clamp(1.5rem, 3.6vw, 3rem);
   display: flex;
   align-items: center;
-  gap: clamp(1rem, 2.5vw, 1.75rem);
+  gap: clamp(1.2rem, 3vw, 2.1rem);
   border-left: 6px solid var(--pc, #6366f1);
   box-shadow: -2px 0 20px color-mix(in srgb, var(--pc, #6366f1) 25%, transparent);
   transition: transform 0.3s ease;
 }
 
-.sb-rank-area { min-width: 3rem; text-align: center; flex-shrink: 0; }
-.sb-medal { font-size: clamp(2.6rem, 5.75vw, 3.88rem); line-height: 1; }
+.sb-rank-area { min-width: 3.6rem; text-align: center; flex-shrink: 0; }
+.sb-medal { font-size: clamp(3.12rem, 6.9vw, 4.66rem); line-height: 1; }
 .sb-rank-num {
-  font-size: clamp(1.9rem, 4vw, 2.59rem);
+  font-size: clamp(2.28rem, 4.8vw, 3.11rem);
   font-weight: 700;
   color: #475569;
 }
@@ -2347,7 +2357,7 @@ button, input, select, textarea {
 }
 
 .sb-name {
-  font-size: clamp(1.9rem, 5.2vw, 3.02rem);
+  font-size: clamp(2.28rem, 6.24vw, 3.62rem);
   font-weight: 700;
   color: var(--pc, #f1f5f9);
   white-space: nowrap;
@@ -2363,7 +2373,7 @@ button, input, select, textarea {
   gap: 0.4rem;
 }
 .sb-score {
-  font-size: clamp(2.48rem, 6.6vw, 4.54rem);
+  font-size: clamp(2.98rem, 7.92vw, 5.45rem);
   font-weight: 800;
   color: #f1f5f9;
   font-variant-numeric: tabular-nums;
@@ -2376,7 +2386,7 @@ button, input, select, textarea {
   border: 1.5px solid rgba(226, 232, 240, 0.45);
   border-radius: 999px;
   padding: 0.2rem 1rem;
-  font-size: clamp(1.04rem, 2vw, 1.44rem);
+  font-size: clamp(1.25rem, 2.4vw, 1.73rem);
   font-weight: 600;
   color: #e2e8f0;
   font-variant-numeric: tabular-nums;
@@ -2406,13 +2416,13 @@ button, input, select, textarea {
 }
 /* Phase 10: phase and penalty are direct rows in sb-player-body */
 .sb-phase {
-  font-size: clamp(1.9rem, 4.3vw, 3.02rem);
+  font-size: clamp(2.28rem, 5.16vw, 3.62rem);
   font-weight: 700;
   color: #51f8e4;
   line-height: 1.1;
 }
 .sb-penalty {
-  font-size: clamp(1.375rem, 2.75vw, 2.06rem);
+  font-size: clamp(1.65rem, 3.3vw, 2.47rem);
   font-weight: 600;
   color: #c0d3ef;
 }
@@ -2536,18 +2546,6 @@ button, input, select, textarea {
   border-top: 2px solid rgba(255,255,255,0.12);
 }
 
-/* ── Scoreboard round banner ── */
-.sb-round-banner {
-  text-align: center;
-  font-size: clamp(4rem, 12vw, 12rem);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #fff;
-  padding: clamp(0.75rem, 2vw, 1.25rem) 1rem clamp(0.5rem, 1.5vw, 1rem);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  margin-bottom: 0.25rem;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.3);
-}
 
 /* ─── Round Display Mode ────────────────────────────────────────────────────── */
 .round-display-mode .app-header,

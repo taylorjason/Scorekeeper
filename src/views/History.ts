@@ -176,17 +176,17 @@ export class History {
 
             <div class="history-filter-group" style="flex:1;min-width:0">
               <div class="section-title mb-1">Date Range</div>
-              <div class="filter-bar mb-2" role="group" aria-label="Date presets" style="flex-wrap:nowrap;gap:0.3rem">
-                ${datePresets.map(([val, label]) =>
-                  `<button class="tab-btn ${activePreset === val ? 'active' : ''}" data-date-preset="${val}" style="padding:4px 10px;font-size:0.8rem">${label}</button>`
-                ).join('')}
-              </div>
-              <div style="display:flex;gap:0.5rem;align-items:center">
+              <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem">
                 <input type="date" id="date-from" class="form-input" value="${this.filterDateFrom}"
                   aria-label="From date" style="flex:1;min-width:0;padding:6px 8px;font-size:0.85rem">
                 <span style="color:var(--text-muted);flex-shrink:0;font-size:0.9rem">–</span>
                 <input type="date" id="date-to" class="form-input" value="${this.filterDateTo}"
                   aria-label="To date" style="flex:1;min-width:0;padding:6px 8px;font-size:0.85rem">
+              </div>
+              <div class="filter-bar" role="group" aria-label="Date presets" style="flex-wrap:nowrap;gap:0.3rem">
+                ${datePresets.map(([val, label]) =>
+                  `<button class="tab-btn ${activePreset === val ? 'active' : ''}" data-date-preset="${val}" style="padding:4px 10px;font-size:0.8rem">${label}</button>`
+                ).join('')}
               </div>
             </div>
 

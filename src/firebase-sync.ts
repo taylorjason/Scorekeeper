@@ -14,10 +14,21 @@ const DEFAULT_FIREBASE_CONFIG = {
 
 // ─── Device ID ───────────────────────────────────────────────────────────────
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for older mobile WebKit
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (crypto.getRandomValues(new Uint8Array(1))[0] & 0xf) | (c === 'x' ? 0 : 0x8);
+    return r.toString(16);
+  });
+}
+
 function getDeviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = generateUUID();
     localStorage.setItem(DEVICE_ID_KEY, id);
   }
   return id;

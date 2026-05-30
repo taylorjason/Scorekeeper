@@ -23,6 +23,7 @@ export class Settings {
   private roomConfig: FirebaseRoomConfig | null = null;
   private editingPlayerId: number | null = null;
   private editingGameId: number | null = null;
+  private activeTab: 'players' | 'games' | 'sync' | 'data' = 'players';
 
   async load(): Promise<void> {
     const [players, games] = await Promise.all([getPlayers(), getGames()]);
@@ -40,194 +41,181 @@ export class Settings {
   render(): string {
     const theme = document.documentElement.getAttribute('data-theme') ?? 'dark';
     const isDark = theme !== 'light';
+    const t = this.activeTab;
+    const panel = (id: typeof t) => id === t ? '' : 'style="display:none"';
 
     return `
       <main class="view" aria-label="Settings">
         <header class="page-header">
           <h1 class="page-title">Settings</h1>
-          <p class="page-subtitle" style="font-size:0.75rem;opacity:0.6">
-            v${__APP_VERSION__} · build ${__BUILD_NUMBER__} · ${new Date(__BUILD_TIME__).toLocaleString()}
-          </p>
         </header>
 
-        <!-- Players Section -->
-        <section class="settings-section" aria-labelledby="players-section-heading">
-          <h2 class="settings-section-title" id="players-section-heading">
-            <span>👥</span> Players
-          </h2>
-          <div id="players-list">
-            ${this.renderPlayersList()}
-          </div>
+        <div class="stats-main-tabs" role="tablist" aria-label="Settings sections">
+          <button class="stats-main-tab-btn ${t === 'players' ? 'active' : ''}" data-settings-tab="players" role="tab">Players</button>
+          <button class="stats-main-tab-btn ${t === 'games'   ? 'active' : ''}" data-settings-tab="games"   role="tab">Games</button>
+          <button class="stats-main-tab-btn ${t === 'sync'    ? 'active' : ''}" data-settings-tab="sync"    role="tab">Sync</button>
+          <button class="stats-main-tab-btn ${t === 'data'    ? 'active' : ''}" data-settings-tab="data"    role="tab">Data</button>
+        </div>
+
+        <!-- Players tab -->
+        <div id="settings-tab-players" role="tabpanel" ${panel('players')}>
+          <div id="players-list">${this.renderPlayersList()}</div>
           <div class="card mt-4" id="add-player-form-container">
             <h3 class="card-title mb-3">${this.editingPlayerId !== null ? 'Edit Player' : 'Add Player'}</h3>
             ${this.renderPlayerForm()}
           </div>
-        </section>
+        </div>
 
-        <!-- Games Section -->
-        <section class="settings-section" aria-labelledby="games-section-heading">
-          <h2 class="settings-section-title" id="games-section-heading">
-            <span>🎯</span> Games
-          </h2>
-          <div id="games-list">
-            ${this.renderGamesList()}
-          </div>
+        <!-- Games tab -->
+        <div id="settings-tab-games" role="tabpanel" ${panel('games')}>
+          <div id="games-list">${this.renderGamesList()}</div>
           <div class="card mt-4" id="add-game-form-container">
             <h3 class="card-title mb-3">${this.editingGameId !== null ? 'Edit Game' : 'Add Game'}</h3>
             ${this.renderGameForm()}
           </div>
-        </section>
+        </div>
 
-        <!-- Live Sync Section -->
-        <section class="settings-section" aria-labelledby="live-sync-section-heading">
-          <h2 class="settings-section-title" id="live-sync-section-heading">
-            <span>⚡</span> Live Sync
-            ${isFirebaseSyncActive() ? '<span class="sync-live-badge">● Live</span>' : ''}
-          </h2>
-          ${this.renderFirebaseSection()}
-        </section>
+        <!-- Sync tab -->
+        <div id="settings-tab-sync" role="tabpanel" ${panel('sync')}>
+          <section class="settings-section" aria-labelledby="live-sync-heading">
+            <h2 class="settings-section-title" id="live-sync-heading">
+              <span>⚡</span> Live Sync
+              ${isFirebaseSyncActive() ? '<span class="sync-live-badge">● Live</span>' : ''}
+            </h2>
+            ${this.renderFirebaseSection()}
+          </section>
 
-        <!-- Git Sync Section -->
-        <section class="settings-section" aria-labelledby="sync-section-heading">
-          <h2 class="settings-section-title" id="sync-section-heading">
-            <span>☁️</span> Git Backup
-          </h2>
-
-          <div class="alert alert-warning mb-3">
-            <span>⚠️</span>
-            <span>Your API key / token is stored in localStorage. Never share it or use it on untrusted devices.</span>
-          </div>
-
-          <div class="card">
-            <form id="sync-form" novalidate>
-
-              <!-- Provider picker -->
-              <div class="form-group">
-                <label class="form-label">Provider</label>
-                <div class="provider-toggle" role="group" aria-label="Sync provider">
-                  <button type="button" class="provider-btn ${(this.syncConfig?.provider ?? 'github') === 'github' ? 'active' : ''}"
-                    id="provider-github" data-provider="github" aria-pressed="${(this.syncConfig?.provider ?? 'github') === 'github'}">
-                    GitHub
-                  </button>
-                  <button type="button" class="provider-btn ${this.syncConfig?.provider === 'gitea' ? 'active' : ''}"
-                    id="provider-gitea" data-provider="gitea" aria-pressed="${this.syncConfig?.provider === 'gitea'}">
-                    Gitea
-                  </button>
-                </div>
-              </div>
-
-              <!-- Gitea-only: base URL -->
-              <div class="form-group" id="sync-baseurl-group" style="display:${this.syncConfig?.provider === 'gitea' ? 'block' : 'none'}">
-                <label class="form-label" for="sync-baseurl">Gitea Base URL</label>
-                <input class="form-input" type="url" id="sync-baseurl"
-                  placeholder="https://gitea.example.com" autocomplete="off"
-                  value="${this.syncConfig?.baseUrl ? escHtml(this.syncConfig.baseUrl) : ''}" />
-                <span class="form-hint">Your Gitea instance URL, no trailing slash</span>
-              </div>
-
-              <div class="form-row">
+          <section class="settings-section" aria-labelledby="git-sync-heading">
+            <h2 class="settings-section-title" id="git-sync-heading">
+              <span>☁️</span> Git Backup
+            </h2>
+            <div class="alert alert-warning mb-3">
+              <span>⚠️</span>
+              <span>Your API key / token is stored in localStorage. Never share it or use it on untrusted devices.</span>
+            </div>
+            <div class="card">
+              <form id="sync-form" novalidate>
                 <div class="form-group">
-                  <label class="form-label" for="sync-username">Username</label>
-                  <input class="form-input" type="text" id="sync-username"
-                    placeholder="octocat" autocomplete="off"
-                    value="${this.syncConfig ? escHtml(this.syncConfig.username) : ''}" />
+                  <label class="form-label">Provider</label>
+                  <div class="provider-toggle" role="group" aria-label="Sync provider">
+                    <button type="button" class="provider-btn ${(this.syncConfig?.provider ?? 'github') === 'github' ? 'active' : ''}"
+                      id="provider-github" data-provider="github" aria-pressed="${(this.syncConfig?.provider ?? 'github') === 'github'}">GitHub</button>
+                    <button type="button" class="provider-btn ${this.syncConfig?.provider === 'gitea' ? 'active' : ''}"
+                      id="provider-gitea" data-provider="gitea" aria-pressed="${this.syncConfig?.provider === 'gitea'}">Gitea</button>
+                  </div>
+                </div>
+                <div class="form-group" id="sync-baseurl-group" style="display:${this.syncConfig?.provider === 'gitea' ? 'block' : 'none'}">
+                  <label class="form-label" for="sync-baseurl">Gitea Base URL</label>
+                  <input class="form-input" type="url" id="sync-baseurl"
+                    placeholder="https://gitea.example.com" autocomplete="off"
+                    value="${this.syncConfig?.baseUrl ? escHtml(this.syncConfig.baseUrl) : ''}" />
+                  <span class="form-hint">Your Gitea instance URL, no trailing slash</span>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label" for="sync-username">Username</label>
+                    <input class="form-input" type="text" id="sync-username" placeholder="octocat" autocomplete="off"
+                      value="${this.syncConfig ? escHtml(this.syncConfig.username) : ''}" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="sync-repo">Repository</label>
+                    <input class="form-input" type="text" id="sync-repo" placeholder="my-scores" autocomplete="off"
+                      value="${this.syncConfig ? escHtml(this.syncConfig.repo) : ''}" />
+                  </div>
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="sync-repo">Repository</label>
-                  <input class="form-input" type="text" id="sync-repo"
-                    placeholder="my-scores" autocomplete="off"
-                    value="${this.syncConfig ? escHtml(this.syncConfig.repo) : ''}" />
+                  <label class="form-label" for="sync-pat" id="sync-pat-label">
+                    ${this.syncConfig?.provider === 'gitea' ? 'API Key' : 'Personal Access Token'}
+                  </label>
+                  <input class="form-input" type="password" id="sync-pat"
+                    placeholder="${this.syncConfig?.provider === 'gitea' ? 'your-api-key' : 'ghp_xxxxxxxxxxxxxxxxxxxx'}"
+                    autocomplete="off" value="${this.syncConfig ? escHtml(this.syncConfig.pat) : ''}" />
+                  <span class="form-hint" id="sync-pat-hint">
+                    ${this.syncConfig?.provider === 'gitea'
+                      ? 'Settings → Applications → Generate Token (needs repository read/write)'
+                      : 'Needs <code>repo</code> scope'}
+                  </span>
                 </div>
-              </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label" for="sync-filepath">File Path</label>
+                    <input class="form-input" type="text" id="sync-filepath" placeholder="scorekeeper.json"
+                      value="${this.syncConfig ? escHtml(this.syncConfig.filePath) : 'scorekeeper.json'}" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="sync-branch">Branch</label>
+                    <input class="form-input" type="text" id="sync-branch" placeholder="main"
+                      value="${this.syncConfig ? escHtml(this.syncConfig.branch) : 'main'}" />
+                  </div>
+                </div>
+                <div class="text-sm text-muted mb-3">
+                  Last sync: <strong id="last-sync-time">${this.formatTimestamp(this.syncConfig?.lastSync)}</strong>
+                </div>
+                <div class="btn-group">
+                  <button type="button" class="btn btn-secondary" id="test-connection-btn">Test</button>
+                  <button type="button" class="btn btn-primary flex-1" id="sync-to-github-btn">↑ Push</button>
+                  <button type="button" class="btn btn-secondary flex-1" id="sync-from-github-btn">↓ Pull</button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
 
-              <div class="form-group">
-                <label class="form-label" for="sync-pat" id="sync-pat-label">
-                  ${this.syncConfig?.provider === 'gitea' ? 'API Key' : 'Personal Access Token'}
+        <!-- Data tab -->
+        <div id="settings-tab-data" role="tabpanel" ${panel('data')}>
+          <section class="settings-section" aria-labelledby="data-heading">
+            <h2 class="settings-section-title" id="data-heading"><span>💾</span> Data</h2>
+            <div class="card">
+              <div class="btn-group" style="flex-direction:column;gap:0.625rem">
+                <button class="btn btn-secondary btn-full" id="export-btn">📤 Export All Data (JSON)</button>
+                <button class="btn btn-secondary btn-full" id="import-btn">📥 Import Data (JSON)</button>
+                <input type="file" id="import-file-input" accept=".json,.JSON,application/json" style="display:none" aria-label="Import JSON file" />
+                <button class="btn btn-secondary btn-full" id="import-external-btn">📥 Import External Game</button>
+                <input type="file" id="import-external-file-input" accept=".json,.JSON,.txt,.TXT,application/json,text/plain" style="display:none" aria-label="Import external game file" />
+                <div class="divider" style="margin:0.25rem 0"></div>
+                <button class="btn btn-danger btn-full" id="clear-data-btn">🗑️ Clear All Data</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" aria-labelledby="appearance-heading">
+            <h2 class="settings-section-title" id="appearance-heading"><span>🎨</span> Appearance</h2>
+            <div class="card">
+              <div class="toggle-row">
+                <div>
+                  <div class="font-semibold">Dark Mode</div>
+                  <div class="text-sm text-muted">Use dark theme</div>
+                </div>
+                <label class="toggle" aria-label="Toggle dark mode">
+                  <input type="checkbox" id="theme-toggle" ${isDark ? 'checked' : ''} role="switch" aria-checked="${isDark}" />
+                  <span class="toggle-slider"></span>
                 </label>
-                <input class="form-input" type="password" id="sync-pat"
-                  placeholder="${this.syncConfig?.provider === 'gitea' ? 'your-api-key' : 'ghp_xxxxxxxxxxxxxxxxxxxx'}"
-                  autocomplete="off"
-                  value="${this.syncConfig ? escHtml(this.syncConfig.pat) : ''}" />
-                <span class="form-hint" id="sync-pat-hint">
-                  ${this.syncConfig?.provider === 'gitea'
-                    ? 'Settings → Applications → Generate Token (needs repository read/write)'
-                    : 'Needs <code>repo</code> scope'}
-                </span>
               </div>
+            </div>
+          </section>
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="sync-filepath">File Path</label>
-                  <input class="form-input" type="text" id="sync-filepath"
-                    placeholder="scorekeeper.json"
-                    value="${this.syncConfig ? escHtml(this.syncConfig.filePath) : 'scorekeeper.json'}" />
+          <section class="settings-section" aria-labelledby="about-heading">
+            <h2 class="settings-section-title" id="about-heading"><span>ℹ️</span> About</h2>
+            <div class="card">
+              <div class="text-sm" style="display:flex;flex-direction:column;gap:0.4rem">
+                <div class="flex items-center gap-2">
+                  <span class="text-muted">Version</span>
+                  <span class="font-semibold">v${__APP_VERSION__}</span>
                 </div>
-                <div class="form-group">
-                  <label class="form-label" for="sync-branch">Branch</label>
-                  <input class="form-input" type="text" id="sync-branch"
-                    placeholder="main"
-                    value="${this.syncConfig ? escHtml(this.syncConfig.branch) : 'main'}" />
+                <div class="flex items-center gap-2">
+                  <span class="text-muted">Build</span>
+                  <span class="font-semibold">${__BUILD_NUMBER__}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-muted">Built</span>
+                  <span class="font-semibold">${new Date(__BUILD_TIME__).toLocaleString()}</span>
                 </div>
               </div>
-
-              <div class="text-sm text-muted mb-3">
-                Last sync: <strong id="last-sync-time">${this.formatTimestamp(this.syncConfig?.lastSync)}</strong>
-              </div>
-              <div class="btn-group">
-                <button type="button" class="btn btn-secondary" id="test-connection-btn">Test</button>
-                <button type="button" class="btn btn-primary flex-1" id="sync-to-github-btn">↑ Push</button>
-                <button type="button" class="btn btn-secondary flex-1" id="sync-from-github-btn">↓ Pull</button>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <!-- Data Section -->
-        <section class="settings-section" aria-labelledby="data-section-heading">
-          <h2 class="settings-section-title" id="data-section-heading">
-            <span>💾</span> Data
-          </h2>
-          <div class="card">
-            <div class="btn-group" style="flex-direction:column; gap:0.625rem">
-              <button class="btn btn-secondary btn-full" id="export-btn">
-                📤 Export All Data (JSON)
-              </button>
-              <button class="btn btn-secondary btn-full" id="import-btn">
-                📥 Import Data (JSON)
-              </button>
-              <input type="file" id="import-file-input" accept=".json,.JSON,application/json" style="display:none" aria-label="Import JSON file" />
-              <button class="btn btn-secondary btn-full" id="import-external-btn">
-                📥 Import External Game
-              </button>
-              <input type="file" id="import-external-file-input" accept=".json,.JSON,.txt,.TXT,application/json,text/plain" style="display:none" aria-label="Import external game file" />
-              <div class="divider" style="margin: 0.25rem 0"></div>
-              <button class="btn btn-danger btn-full" id="clear-data-btn">
-                🗑️ Clear All Data
-              </button>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
 
-        <!-- Appearance Section -->
-        <section class="settings-section" aria-labelledby="appearance-section-heading">
-          <h2 class="settings-section-title" id="appearance-section-heading">
-            <span>🎨</span> Appearance
-          </h2>
-          <div class="card">
-            <div class="toggle-row">
-              <div>
-                <div class="font-semibold">Dark Mode</div>
-                <div class="text-sm text-muted">Use dark theme</div>
-              </div>
-              <label class="toggle" aria-label="Toggle dark mode">
-                <input type="checkbox" id="theme-toggle" ${isDark ? 'checked' : ''} role="switch" aria-checked="${isDark}" />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <div style="height: 1rem"></div>
+        <div style="height:1rem"></div>
       </main>
     `;
   }
@@ -454,6 +442,18 @@ export class Settings {
   }
 
   afterRender(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-settings-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.activeTab = btn.dataset['settingsTab'] as typeof this.activeTab;
+        document.querySelectorAll('[data-settings-tab]').forEach(b =>
+          b.classList.toggle('active', b === btn)
+        );
+        document.querySelectorAll<HTMLElement>('[id^="settings-tab-"]').forEach(panel => {
+          panel.style.display = panel.id === `settings-tab-${this.activeTab}` ? '' : 'none';
+        });
+      });
+    });
+
     this.bindPlayerForm();
     this.bindGameForm();
     this.bindFirebaseSection();

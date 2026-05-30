@@ -27,6 +27,8 @@ export class History {
   private allGames: Game[] = [];
   private filterPlayerId: number | null = null;
   private filterGameId: number | null = null;
+  private filterDateFrom: string = '';   // YYYY-MM-DD or ''
+  private sortOrder: 'desc' | 'asc' = 'desc';
 
   async load(): Promise<void> {
     const [nights, players, games] = await Promise.all([
@@ -90,7 +92,26 @@ export class History {
         n.matches.some(m => m.match.gameId === gid)
       );
     }
+    if (this.filterDateFrom) {
+      result = result.filter(n => n.night.date >= this.filterDateFrom);
+    }
+    if (this.sortOrder === 'asc') {
+      result = [...result].reverse();
+    }
     return result;
+  }
+
+  private dateFromPreset(preset: string): string {
+    if (!preset) return '';
+    const d = new Date();
+    switch (preset) {
+      case '30d':  d.setDate(d.getDate() - 30); break;
+      case '3mo':  d.setMonth(d.getMonth() - 3); break;
+      case '6mo':  d.setMonth(d.getMonth() - 6); break;
+      case '1yr':  d.setFullYear(d.getFullYear() - 1); break;
+      default: return '';
+    }
+    return d.toISOString().slice(0, 10);
   }
 
   render(): string {
@@ -139,6 +160,17 @@ export class History {
           <div class="filter-bar" role="group" aria-label="Player filter">${playerFilterBtns}</div>
           <div class="section-title mb-2 mt-4">Filter by Game</div>
           <div class="filter-bar" role="group" aria-label="Game filter">${gameFilterBtns}</div>
+          <div class="section-title mb-2 mt-4">Date Range</div>
+          <div class="filter-bar" role="group" aria-label="Date range filter">
+            ${[['', 'All Time'], ['30d', 'Last 30d'], ['3mo', 'Last 3mo'], ['6mo', 'Last 6mo'], ['1yr', 'This Year']].map(([val, label]) =>
+              `<button class="tab-btn ${this.filterDateFrom === this.dateFromPreset(val) ? 'active' : ''}" data-date-preset="${val}">${label}</button>`
+            ).join('')}
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:0.75rem">
+            <button class="btn btn-secondary btn-sm" id="sort-toggle" aria-label="Toggle sort order">
+              ${this.sortOrder === 'desc' ? '↓ Newest First' : '↑ Oldest First'}
+            </button>
+          </div>
         </section>
 
         <section aria-label="Game nights list" id="nights-list">
@@ -407,6 +439,20 @@ export class History {
       });
     });
 
+    // Date preset buttons
+    document.querySelectorAll<HTMLButtonElement>('[data-date-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.filterDateFrom = this.dateFromPreset(btn.dataset['datePreset'] ?? '');
+        this.refreshList();
+      });
+    });
+
+    // Sort toggle
+    document.getElementById('sort-toggle')?.addEventListener('click', () => {
+      this.sortOrder = this.sortOrder === 'desc' ? 'asc' : 'desc';
+      this.refreshList();
+    });
+
     // Toggle expand
     document.querySelectorAll('.history-header').forEach(header => {
       const toggle = () => {
@@ -505,5 +551,10 @@ export class History {
       const val = btn.dataset['gameFilter'];
       btn.classList.toggle('active', val === 'null' ? this.filterGameId === null : parseInt(val ?? '', 10) === this.filterGameId);
     });
+    document.querySelectorAll<HTMLButtonElement>('[data-date-preset]').forEach(btn => {
+      btn.classList.toggle('active', this.filterDateFrom === this.dateFromPreset(btn.dataset['datePreset'] ?? ''));
+    });
+    const sortBtn = document.getElementById('sort-toggle');
+    if (sortBtn) sortBtn.textContent = this.sortOrder === 'desc' ? '↓ Newest First' : '↑ Oldest First';
   }
 }

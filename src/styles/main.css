@@ -2241,23 +2241,24 @@ button, input, select, textarea {
 }
 
 .sb-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.25rem;
 }
-.sb-header-left { flex: 1; min-width: 0; }
-.sb-header-center { flex: 0 1 auto; display: flex; align-items: center; justify-content: center; padding: 0 1rem; }
-.sb-header-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+.sb-header-left { min-width: 0; }
+.sb-header-center { display: flex; justify-content: center; }
+.sb-header-right { display: flex; align-items: center; gap: 0.75rem; justify-content: flex-end; }
 
 .sb-round-inline {
-  font-size: clamp(1.75rem, 4.5vw, 3.5rem);
+  font-size: clamp(4rem, 12vw, 12rem);
   font-weight: 800;
   color: #fff;
   white-space: nowrap;
   letter-spacing: -0.02em;
   text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  line-height: 1;
 }
 
 .sb-game-name {

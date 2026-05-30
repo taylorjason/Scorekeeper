@@ -239,10 +239,20 @@ export class History {
       `<th>${labels?.[r - 1] ? escHtml(labels[r - 1]) : `R${r}`}</th>`
     ).join('');
 
+    const isFirstOut = (note?: string): boolean => {
+      if (note === 'first_out') return true;
+      if (note) {
+        try { return !!(JSON.parse(note) as { firstOut?: boolean }).firstOut; }
+        catch { /* not JSON */ }
+      }
+      return false;
+    };
+
     const bodyRows = md.playerTotals.map(({ player, total }, i) => {
       const roundCells = rounds.map(r => {
         const entry = md.entries.find(e => e.playerId === player.id && e.roundNumber === r);
-        return `<td class="score-table-score">${entry !== undefined ? entry.value : '—'}</td>`;
+        const fo = entry !== undefined && isFirstOut(entry.note);
+        return `<td class="score-table-score">${fo ? '⚡ ' : ''}${entry !== undefined ? entry.value : '—'}</td>`;
       }).join('');
       return `
         <tr class="${i === 0 && md.match.status === 'completed' ? 'score-table-total-row' : ''}">
@@ -267,7 +277,7 @@ export class History {
           <h2 class="modal-title">${md.game ? escHtml(md.game.name) : 'Score Table'}</h2>
           <button class="icon-btn modal-close-btn" aria-label="Close">✕</button>
         </div>
-        <div class="score-table-wrapper" style="overflow-x:auto;max-height:60vh;overflow-y:auto">
+        <div class="score-table-wrapper" style="overflow-x:auto;overflow-y:auto">
           <table class="score-table">
             <thead>
               <tr>

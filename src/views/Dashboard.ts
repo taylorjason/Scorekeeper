@@ -1,6 +1,7 @@
 import { getGameNights, getActiveMatch } from '../db';
 import { computeLeaderboard } from '../stats';
 import { navigate } from '../router';
+import { escHtml } from '../utils';
 import type { GameNight, Match } from '../types';
 
 export class Dashboard {
@@ -73,7 +74,7 @@ export class Dashboard {
           <div class="flex items-center gap-3">
             <div>
               <div class="history-date">${this.formatDate(night.date)}</div>
-              <div class="font-semibold">${this.escHtml(night.title)}</div>
+              <div class="font-semibold">${escHtml(night.title)}</div>
             </div>
             <span style="margin-left:auto; color:var(--text-muted)">›</span>
           </div>
@@ -102,7 +103,7 @@ export class Dashboard {
                 <td>
                   <div class="flex items-center gap-2">
                     <span class="player-dot" style="background:${entry.player.color}"></span>
-                    ${this.escHtml(entry.player.displayName)}
+                    ${escHtml(entry.player.displayName)}
                   </div>
                 </td>
                 <td><strong>${entry.wins}</strong></td>
@@ -178,7 +179,4 @@ export class Dashboard {
     });
   }
 
-  private escHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
 }

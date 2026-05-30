@@ -4,6 +4,7 @@ import {
 } from '../db';
 import { navigate } from '../router';
 import { showToast } from '../toast';
+import { escHtml } from '../utils';
 import type { GameNight, Match, Player, Game } from '../types';
 
 interface NightWithMatches {
@@ -69,10 +70,6 @@ export class History {
     );
   }
 
-  private escHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   private formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -103,7 +100,7 @@ export class History {
       ...this.allPlayers.map(p =>
         `<button class="tab-btn ${this.filterPlayerId === p.id ? 'active' : ''}" data-player-filter="${p.id}">
           <span class="player-dot" style="background:${p.color}"></span>
-          ${this.escHtml(p.displayName)}
+          ${escHtml(p.displayName)}
         </button>`
       )
     ].join('');
@@ -111,7 +108,7 @@ export class History {
     const gameFilterBtns = [
       `<button class="tab-btn ${this.filterGameId === null ? 'active' : ''}" data-game-filter="null">All Games</button>`,
       ...this.allGames.map(g =>
-        `<button class="tab-btn ${this.filterGameId === g.id ? 'active' : ''}" data-game-filter="${g.id}">${this.escHtml(g.name)}</button>`
+        `<button class="tab-btn ${this.filterGameId === g.id ? 'active' : ''}" data-game-filter="${g.id}">${escHtml(g.name)}</button>`
       )
     ].join('');
 
@@ -169,10 +166,10 @@ export class History {
 
     return `
       <div class="history-item ${isHighlighted ? 'highlighted' : ''}" id="night-${night.id}" data-night-id="${night.id}">
-        <div class="history-header" role="button" aria-expanded="false" aria-controls="night-body-${night.id}" tabindex="0" aria-label="Toggle ${this.escHtml(night.title)}">
+        <div class="history-header" role="button" aria-expanded="false" aria-controls="night-body-${night.id}" tabindex="0" aria-label="Toggle ${escHtml(night.title)}">
           <div>
             <div class="history-date">${this.formatDate(night.date)}</div>
-            <div class="history-title">${this.escHtml(night.title)}</div>
+            <div class="history-title">${escHtml(night.title)}</div>
             <div class="history-meta">${meta}</div>
           </div>
           <svg class="expand-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -182,14 +179,14 @@ export class History {
           </svg>
         </div>
         <div class="history-body ${isHighlighted ? 'open' : ''}" id="night-body-${night.id}">
-          ${night.notes ? `<p class="text-sm text-muted" style="padding: 0.5rem 0; font-style:italic">${this.escHtml(night.notes)}</p>` : ''}
+          ${night.notes ? `<p class="text-sm text-muted" style="padding: 0.5rem 0; font-style:italic">${escHtml(night.notes)}</p>` : ''}
           ${matchesHtml}
           <div style="padding-top:0.75rem; display:flex; justify-content:flex-end; gap:0.5rem; border-top: 1px solid var(--border); margin-top: 0.5rem">
             ${activeMatches.length > 0 ? `<button class="btn btn-primary btn-sm resume-btn" data-match-id="${activeMatches[0].match.id}">Resume Match</button>` : ''}
-            <button class="btn btn-secondary btn-sm add-match-btn" data-night-id="${night.id}" aria-label="Add match to ${this.escHtml(night.title)}">
+            <button class="btn btn-secondary btn-sm add-match-btn" data-night-id="${night.id}" aria-label="Add match to ${escHtml(night.title)}">
               + Add Match
             </button>
-            <button class="btn btn-danger btn-sm delete-night-btn" data-night-id="${night.id}" aria-label="Delete ${this.escHtml(night.title)}">
+            <button class="btn btn-danger btn-sm delete-night-btn" data-night-id="${night.id}" aria-label="Delete ${escHtml(night.title)}">
               Delete Night
             </button>
           </div>
@@ -207,7 +204,7 @@ export class History {
       <div class="flex items-center gap-2" style="padding: 3px 0">
         ${i === 0 && md.match.status === 'completed' ? '🏆' : ''}
         <span class="player-dot" style="background:${pt.player.color}"></span>
-        <span class="text-sm">${this.escHtml(pt.player.displayName)}</span>
+        <span class="text-sm">${escHtml(pt.player.displayName)}</span>
         <span class="text-sm font-semibold" style="margin-left:auto">${pt.total}</span>
       </div>
     `).join('');
@@ -215,9 +212,9 @@ export class History {
     return `
       <div class="match-result">
         <div class="match-result-title">
-          ${md.game ? this.escHtml(md.game.name) : 'Unknown Game'}
+          ${md.game ? escHtml(md.game.name) : 'Unknown Game'}
           ${statusBadge}
-          ${md.winner ? `<span class="winner-label">🏆 ${this.escHtml(md.winner.displayName)}</span>` : ''}
+          ${md.winner ? `<span class="winner-label">🏆 ${escHtml(md.winner.displayName)}</span>` : ''}
         </div>
         <div style="padding-left: 0.25rem">
           ${scoresHtml}
@@ -231,14 +228,14 @@ export class History {
     if (existing) existing.remove();
 
     const gameOptions = this.allGames.map(g =>
-      `<option value="${g.id}">${this.escHtml(g.name)}</option>`
+      `<option value="${g.id}">${escHtml(g.name)}</option>`
     ).join('');
 
     const playerChecks = this.allPlayers.map(p => `
       <label class="flex items-center gap-2" style="padding:0.25rem 0; cursor:pointer">
         <input type="checkbox" name="player" value="${p.id}" style="accent-color:${p.color}">
         <span class="player-dot" style="background:${p.color}"></span>
-        <span>${this.escHtml(p.displayName)}</span>
+        <span>${escHtml(p.displayName)}</span>
       </label>
     `).join('');
 

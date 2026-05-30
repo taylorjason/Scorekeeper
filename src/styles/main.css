@@ -1889,6 +1889,21 @@ button, input, select, textarea {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.round-timer {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Round duration in ActiveMatch score table label column */
+.score-table-dur {
+  display: block;
+  font-size: 0.7em;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 0.1em;
+}
 .dealer-pill {
   display: inline-flex;
   align-items: center;
@@ -1926,6 +1941,19 @@ button, input, select, textarea {
   vertical-align: middle;
   margin-left: 0.3em;
   opacity: 0.9;
+}
+.sb-leader-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(251, 191, 36, 0.18);
+  border: 1.5px solid rgba(251, 191, 36, 0.6);
+  border-radius: 999px;
+  padding: 0.2rem 1rem;
+  font-size: clamp(1.04rem, 2vw, 1.44rem);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: #fbbf24;
+  text-transform: uppercase;
 }
 
 /* ─── Configure panel (player order + dealer) ────────────────────────────────── */
@@ -1985,6 +2013,53 @@ button, input, select, textarea {
   color: var(--primary);
 }
 
+/* ─── Match switcher (multi-match nights) ────────────────────────────────────── */
+.match-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+.match-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.match-pill--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  cursor: default;
+}
+.match-pill--done {
+  background: rgba(16,185,129,0.12);
+  color: var(--success, #10b981);
+  border-color: rgba(16,185,129,0.35);
+}
+.match-pill--done:hover {
+  background: rgba(16,185,129,0.2);
+}
+.match-pill--idle {
+  background: var(--surface);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+.match-pill--idle:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
 /* ─── Scoreboard Mode ────────────────────────────────────────────────────────── */
 .scoreboard-mode .app-header,
 .scoreboard-mode .bottom-nav,
@@ -2014,7 +2089,7 @@ button, input, select, textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.25rem;
 }
 .sb-header-left { flex: 1; min-width: 0; }
 .sb-header-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
@@ -2155,6 +2230,23 @@ button, input, select, textarea {
   background: rgba(251, 191, 36, 0.15);
   border-color: rgba(251, 191, 36, 0.5);
   color: #fbbf24;
+}
+.sb-trend {
+  margin-left: 0.45em;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.sb-trend--up   { color: #4ade80; }
+.sb-trend--down { color: #f87171; }
+/* Round duration label inside scoreboard table */
+.sbt-dur {
+  display: block;
+  font-size: 0.7em;
+  font-weight: 500;
+  color: #475569;
+  margin-top: 0.15em;
+  letter-spacing: 0;
 }
 /* Phase 10: phase and penalty are direct rows in sb-player-body */
 .sb-phase {

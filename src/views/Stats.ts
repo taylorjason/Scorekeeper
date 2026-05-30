@@ -1,5 +1,6 @@
 import { db } from '../db';
 import { computePlayerStats, computeLeaderboard, computeGameStats } from '../stats';
+import { escHtml } from '../utils';
 import type { Player, Game } from '../types';
 
 export class Stats {
@@ -28,17 +29,13 @@ export class Stats {
     }
   }
 
-  private escHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   render(): string {
     const tabsHtml = this.players.map(p => `
       <button class="tab-btn ${this.selectedPlayerId === p.id ? 'active' : ''}"
         data-player-id="${p.id}" aria-selected="${this.selectedPlayerId === p.id}"
-        aria-label="${this.escHtml(p.displayName)}">
+        aria-label="${escHtml(p.displayName)}">
         <span class="player-dot" style="background:${p.color}"></span>
-        ${this.escHtml(p.displayName)}
+        ${escHtml(p.displayName)}
       </button>
     `).join('');
 
@@ -53,7 +50,7 @@ export class Stats {
           <div class="card-header">
             <h2 class="card-title" id="player-stats-heading">
               ${selectedPlayer ? `<span class="player-dot" style="background:${selectedPlayer.color}; margin-right:6px"></span>` : ''}
-              ${selectedPlayer ? this.escHtml(selectedPlayer.displayName) : 'Player'} Stats
+              ${selectedPlayer ? escHtml(selectedPlayer.displayName) : 'Player'} Stats
             </h2>
           </div>
           <div class="stat-grid">
@@ -110,7 +107,7 @@ export class Stats {
               <tbody>
                 ${stats.gameBreakdown.map(gb => `
                   <tr>
-                    <td>${this.escHtml(gb.gameName)}</td>
+                    <td>${escHtml(gb.gameName)}</td>
                     <td>${gb.gamesPlayed}</td>
                     <td>${gb.wins}</td>
                     <td>${gb.avgScore}</td>
@@ -153,7 +150,7 @@ export class Stats {
                   <div class="flex items-center gap-2">
                     <span class="player-dot" style="background:${entry.player.color}"></span>
                     <button class="btn btn-ghost btn-sm" style="padding:0; min-height:auto; font-size:0.9rem"
-                      data-player-id="${entry.player.id}">${this.escHtml(entry.player.displayName)}</button>
+                      data-player-id="${entry.player.id}">${escHtml(entry.player.displayName)}</button>
                   </div>
                 </td>
                 <td><strong>${entry.wins}</strong></td>
@@ -173,7 +170,7 @@ export class Stats {
           ${this.games.map(g => `
             <div class="flex items-center gap-3 mb-2" style="padding: 0.5rem 0; border-bottom: 1px solid var(--border)">
               <div class="flex-1">
-                <div class="font-semibold text-sm">${this.escHtml(g.name)}</div>
+                <div class="font-semibold text-sm">${escHtml(g.name)}</div>
                 <div class="text-xs text-muted">${g.scoringMode} scoring</div>
               </div>
               <span id="game-match-count-${g.id}" class="badge badge-muted text-xs">Loading...</span>

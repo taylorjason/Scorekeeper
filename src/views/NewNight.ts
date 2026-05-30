@@ -1,6 +1,7 @@
 import { getPlayers, getGames, createGameNight, createMatch } from '../db';
 import { navigate } from '../router';
 import { showToast } from '../toast';
+import { escHtml } from '../utils';
 import type { Player, Game } from '../types';
 
 interface MatchConfig {
@@ -30,24 +31,20 @@ export class NewNight {
     this.games = games;
   }
 
-  private escHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   render(): string {
     const today = new Date().toISOString().split('T')[0];
 
     const gameOptions = this.games.length === 0
       ? '<option value="">No games — add in Settings</option>'
-      : this.games.map(g => `<option value="${g.id}">${this.escHtml(g.name)}</option>`).join('');
+      : this.games.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
 
     const playerCheckboxes = this.players.length === 0
       ? '<p class="text-sm text-muted">No players — add in Settings</p>'
       : this.players.map(p => `
           <label class="checkbox-item" for="player-check-${p.id}">
-            <input type="checkbox" id="player-check-${p.id}" value="${p.id}" class="match-player-check" aria-label="${this.escHtml(p.displayName)}">
+            <input type="checkbox" id="player-check-${p.id}" value="${p.id}" class="match-player-check" aria-label="${escHtml(p.displayName)}">
             <span class="player-dot" style="background:${p.color}"></span>
-            <span>${this.escHtml(p.displayName)}</span>
+            <span>${escHtml(p.displayName)}</span>
           </label>
         `).join('');
 
@@ -157,9 +154,9 @@ export class NewNight {
         <div class="player-list-item" data-match-index="${i}">
           <span style="font-size:1.25rem">🎯</span>
           <div style="flex:1; min-width:0">
-            <div class="font-semibold text-sm">${this.escHtml(m.gameName)}</div>
-            <div class="text-xs text-muted">${m.playerNames.map(n => this.escHtml(n)).join(' → ')}</div>
-            ${dealerName ? `<div class="text-xs text-muted">🃏 First dealer: ${this.escHtml(dealerName)}</div>` : ''}
+            <div class="font-semibold text-sm">${escHtml(m.gameName)}</div>
+            <div class="text-xs text-muted">${m.playerNames.map(n => escHtml(n)).join(' → ')}</div>
+            ${dealerName ? `<div class="text-xs text-muted">🃏 First dealer: ${escHtml(dealerName)}</div>` : ''}
           </div>
           <div class="actions">
             <button type="button" class="btn btn-icon btn-sm remove-match-btn" data-index="${i}" aria-label="Remove match ${i + 1}">
@@ -187,7 +184,7 @@ export class NewNight {
         <div class="configure-player-row">
           <div class="configure-player-info">
             <span class="player-dot" style="background:${player.color}; flex-shrink:0"></span>
-            <span class="configure-player-name">${this.escHtml(player.displayName)}</span>
+            <span class="configure-player-name">${escHtml(player.displayName)}</span>
           </div>
           <div class="configure-player-actions">
             <button type="button" class="btn btn-icon btn-sm configure-dealer-btn ${isDealer ? 'dealer-selected' : ''}"

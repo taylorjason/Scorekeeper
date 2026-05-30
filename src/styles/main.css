@@ -1889,6 +1889,21 @@ button, input, select, textarea {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.round-timer {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Round duration in ActiveMatch score table label column */
+.score-table-dur {
+  display: block;
+  font-size: 0.7em;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 0.1em;
+}
 .dealer-pill {
   display: inline-flex;
   align-items: center;
@@ -2202,6 +2217,23 @@ button, input, select, textarea {
   background: rgba(251, 191, 36, 0.15);
   border-color: rgba(251, 191, 36, 0.5);
   color: #fbbf24;
+}
+.sb-trend {
+  margin-left: 0.45em;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.sb-trend--up   { color: #4ade80; }
+.sb-trend--down { color: #f87171; }
+/* Round duration label inside scoreboard table */
+.sbt-dur {
+  display: block;
+  font-size: 0.7em;
+  font-weight: 500;
+  color: #475569;
+  margin-top: 0.15em;
+  letter-spacing: 0;
 }
 /* Phase 10: phase and penalty are direct rows in sb-player-body */
 .sb-phase {

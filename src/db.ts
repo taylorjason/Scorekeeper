@@ -11,6 +11,9 @@ export class ScorekeeperDB extends Dexie {
 
   constructor() {
     super('ScorekeeperDB');
+    // Dexie v3 multiplies declared versions by 10 internally (version 1 → IDB 10,
+    // version 2 → IDB 20). Keep version 1 so existing IDB-10 browsers upgrade
+    // cleanly, and add version 2 so browsers already at IDB-20 open without error.
     this.version(1).stores({
       players: '++id, displayName, active, createdAt',
       games: '++id, name, scoringMode, createdAt',
@@ -20,7 +23,12 @@ export class ScorekeeperDB extends Dexie {
       statSnapshots: '++id, playerId, gameId, lastPlayed',
     });
     this.version(2).stores({
-      customStatEntries: '++id, matchId, gameId, fieldId, playerId, roundNumber, createdAt',
+      players: '++id, displayName, active, createdAt',
+      games: '++id, name, scoringMode, createdAt',
+      gameNights: '++id, date, createdAt',
+      matches: '++id, gameNightId, gameId, status, winnerId, createdAt',
+      scoreEntries: '++id, matchId, playerId, roundNumber, createdAt',
+      statSnapshots: '++id, playerId, gameId, lastPlayed',
     });
   }
 }

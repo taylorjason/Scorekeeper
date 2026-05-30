@@ -2032,102 +2032,6 @@ button, input, select, textarea {
   color: var(--text);
 }
 
-/* ─── Emoji / Icon picker ─────────────────────────────────────────────────────── */
-.icon-picker-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: border-color 0.15s, background 0.15s;
-  flex-shrink: 0;
-}
-.icon-picker-btn:hover { border-color: var(--primary); background: var(--bg); }
-.icon-picker-grid {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 200;
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.4rem;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 2px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-  width: max-content;
-  max-width: 320px;
-}
-.emoji-opt {
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1rem;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.1s;
-}
-.emoji-opt:hover { background: var(--bg); }
-.emoji-opt--selected { background: rgba(99,102,241,0.2); outline: 1.5px solid var(--primary); }
-.emoji-opt--clear { font-size: 0.65rem; color: var(--text-muted); }
-.cfield-row-icon { font-size: 1rem; flex-shrink: 0; }
-
-/* ─── Custom Stat Fields — Settings form ─────────────────────────────────────── */
-.cfield-add-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  align-items: center;
-}
-.cfield-add-row .form-input { flex: 1; min-width: 120px; }
-.cfield-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  margin-bottom: 0.3rem;
-}
-.cfield-row-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  flex: 1;
-  min-width: 80px;
-}
-
-/* ─── Custom Stat Fields — ActiveMatch round entry ────────────────────────────── */
-.custom-stats-inline {
-  border-top: 1px solid var(--border);
-  margin-top: 0.75rem;
-  padding-top: 0.5rem;
-}
-.custom-stats-expander {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  cursor: pointer;
-  padding: 0.25rem 0;
-  font-weight: 500;
-}
-.custom-stats-expander:hover { color: var(--text); }
-
 /* ─── Scoreboard Mode ────────────────────────────────────────────────────────── */
 .scoreboard-mode .app-header,
 .scoreboard-mode .bottom-nav,
@@ -2421,11 +2325,6 @@ button, input, select, textarea {
   color: #e2e8f0;
   padding: 0.55rem 0.5rem;
   border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-.sbt-icons {
-  font-size: 0.85em;
-  margin-right: 0.2em;
-  letter-spacing: -0.05em;
 }
 .sbt-total-row .sbt-total {
   text-align: center;

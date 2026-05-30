@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Player, Game, GameNight, Match, ScoreEntry, StatSnapshot, AppData, CustomStatEntry, CustomField } from './types';
+import type { Player, Game, GameNight, Match, ScoreEntry, StatSnapshot, AppData } from './types';
 
 export class ScorekeeperDB extends Dexie {
   players!: Table<Player, number>;
@@ -8,7 +8,6 @@ export class ScorekeeperDB extends Dexie {
   matches!: Table<Match, number>;
   scoreEntries!: Table<ScoreEntry, number>;
   statSnapshots!: Table<StatSnapshot, number>;
-  customStatEntries!: Table<CustomStatEntry, number>;
 
   constructor() {
     super('ScorekeeperDB');
@@ -166,31 +165,8 @@ export async function deleteLastScoreEntry(matchId: number): Promise<boolean> {
     if (entry.id !== undefined) await db.scoreEntries.delete(entry.id);
   }
 
-  // Also delete per-round custom stat entries for that round
-  const customToDelete = await db.customStatEntries
-    .where('matchId').equals(matchId)
-    .filter(e => e.roundNumber === maxRound)
-    .toArray();
-  for (const e of customToDelete) {
-    if (e.id !== undefined) await db.customStatEntries.delete(e.id);
-  }
-
   notifyChange();
   return true;
-}
-
-// ─── Custom Stat Entries ──────────────────────────────────────────────────────
-
-export async function addCustomStatEntry(data: Omit<CustomStatEntry, 'id'>): Promise<number> {
-  return db.customStatEntries.add(data);
-}
-
-export async function getCustomStatEntriesForMatch(matchId: number): Promise<CustomStatEntry[]> {
-  return db.customStatEntries.where('matchId').equals(matchId).toArray();
-}
-
-export async function getCustomStatEntriesForGame(gameId: number): Promise<CustomStatEntry[]> {
-  return db.customStatEntries.where('gameId').equals(gameId).toArray();
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
@@ -314,13 +290,12 @@ export async function computePlayerStats(playerId: number): Promise<{
 // ─── Export / Import ──────────────────────────────────────────────────────────
 
 export async function exportAll(): Promise<AppData> {
-  const [players, games, gameNights, matches, scoreEntries, customStatEntries] = await Promise.all([
+  const [players, games, gameNights, matches, scoreEntries] = await Promise.all([
     db.players.toArray(),
     db.games.toArray(),
     db.gameNights.toArray(),
     db.matches.toArray(),
     db.scoreEntries.toArray(),
-    db.customStatEntries.toArray(),
   ]);
 
   return {
@@ -329,7 +304,6 @@ export async function exportAll(): Promise<AppData> {
     gameNights,
     matches,
     scoreEntries,
-    customStatEntries,
     exportedAt: Date.now(),
     version: '1.0.0',
   };
@@ -342,107 +316,18 @@ export async function importAll(data: AppData, skipEvent = false): Promise<void>
     db.gameNights,
     db.matches,
     db.scoreEntries,
-    db.customStatEntries,
   ], async () => {
     await db.players.clear();
     await db.games.clear();
     await db.gameNights.clear();
     await db.matches.clear();
     await db.scoreEntries.clear();
-    await db.customStatEntries.clear();
 
     if (data.players?.length) await db.players.bulkAdd(data.players);
     if (data.games?.length) await db.games.bulkAdd(data.games);
     if (data.gameNights?.length) await db.gameNights.bulkAdd(data.gameNights);
     if (data.matches?.length) await db.matches.bulkAdd(data.matches);
     if (data.scoreEntries?.length) await db.scoreEntries.bulkAdd(data.scoreEntries);
-    if (data.customStatEntries?.length) await db.customStatEntries.bulkAdd(data.customStatEntries);
   });
   if (!skipEvent) notifyChange();
-}
-
-// ─── One-time migration: first_out notes → customStatEntries ─────────────────
-
-const FIRST_OUT_MIGRATION_KEY = 'scorekeeper_migrated_firstout_v1';
-
-export async function migrateFirstOutToCustomStats(): Promise<void> {
-  if (localStorage.getItem(FIRST_OUT_MIGRATION_KEY)) return;
-
-  const FIRST_OUT_FIELD: CustomField = {
-    id: 'first_out',
-    label: 'First Out',
-    type: 'pick-one',
-    scope: 'player',
-    trigger: 'per-round',
-  };
-
-  const allEntries = await db.scoreEntries.toArray();
-
-  // Plain first_out notes (non-Phase10)
-  const plainFirstOuts = allEntries.filter(e => e.note === 'first_out');
-
-  // Phase 10 notes containing firstOut: true
-  const phase10FirstOuts = allEntries.filter(e => {
-    if (!e.note || e.note === 'first_out') return false;
-    try { return (JSON.parse(e.note) as { firstOut?: boolean }).firstOut === true; }
-    catch { return false; }
-  });
-
-  const allToMigrate = [...plainFirstOuts, ...phase10FirstOuts];
-  if (allToMigrate.length === 0) {
-    localStorage.setItem(FIRST_OUT_MIGRATION_KEY, '1');
-    return;
-  }
-
-  // Ensure the first_out custom field exists on each affected game
-  const matchIds = [...new Set(allToMigrate.map(e => e.matchId))];
-  for (const matchId of matchIds) {
-    const match = await db.matches.get(matchId);
-    if (!match) continue;
-    const game = await db.games.get(match.gameId);
-    if (!game) continue;
-    if (!(game.customFields ?? []).find(f => f.id === 'first_out')) {
-      await db.games.update(match.gameId, {
-        customFields: [...(game.customFields ?? []), FIRST_OUT_FIELD],
-      });
-    }
-  }
-
-  // Create custom stat entries and clean the score entry notes
-  for (const entry of allToMigrate) {
-    const match = await db.matches.get(entry.matchId);
-    if (!match) continue;
-
-    // Idempotent: skip if already migrated
-    const exists = await db.customStatEntries
-      .where('matchId').equals(entry.matchId)
-      .filter(e => e.fieldId === 'first_out' && e.roundNumber === entry.roundNumber && e.playerId === entry.playerId)
-      .first();
-    if (!exists) {
-      await db.customStatEntries.add({
-        matchId: entry.matchId,
-        gameId: match.gameId,
-        fieldId: 'first_out',
-        playerId: entry.playerId,
-        roundNumber: entry.roundNumber,
-        value: 1,
-        createdAt: entry.createdAt,
-      });
-    }
-
-    // Strip first_out from the score entry note
-    if (entry.id !== undefined) {
-      if (entry.note === 'first_out') {
-        await db.scoreEntries.update(entry.id, { note: undefined });
-      } else {
-        try {
-          const d = JSON.parse(entry.note!) as Record<string, unknown>;
-          delete d['firstOut'];
-          await db.scoreEntries.update(entry.id, { note: JSON.stringify(d) });
-        } catch { /* ignore */ }
-      }
-    }
-  }
-
-  localStorage.setItem(FIRST_OUT_MIGRATION_KEY, '1');
 }

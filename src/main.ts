@@ -1,6 +1,5 @@
 import './styles/main.css';
 import { seedDemoData } from './demo';
-import { migrateFirstOutToCustomStats } from './db';
 import { initRouter, onRouteChange, getCurrentRoute, navigate } from './router';
 import type { ParsedRoute } from './router';
 export { showToast } from './toast';
@@ -225,9 +224,6 @@ async function init(): Promise<void> {
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
     showToast('Room config imported — connecting…', 'info');
   }
-
-  // Migrate first_out score entry notes → customStatEntries (one-time, no-op after first run)
-  migrateFirstOutToCustomStats().catch(err => console.warn('[Migration] first_out failed (non-fatal):', err));
 
   // Render the shell immediately so the user never stares at a spinner
   renderAppShell();

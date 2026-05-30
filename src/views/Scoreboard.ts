@@ -1,7 +1,7 @@
-import { getMatch, getGameNight, getScoreEntriesForMatch, getCustomStatEntriesForMatch, db } from '../db';
+import { getMatch, getGameNight, getScoreEntriesForMatch, db } from '../db';
 import { navigate } from '../router';
 import { getRoomConfig, initFirebaseSync } from '../firebase-sync';
-import type { Match, Game, GameNight, Player, ScoreEntry, CustomStatEntry } from '../types';
+import type { Match, Game, GameNight, Player, ScoreEntry } from '../types';
 
 interface PlayerScore {
   player: Player;
@@ -20,7 +20,6 @@ export class Scoreboard {
   private currentRound = 0;
   private lastUpdated = new Date();
   private _view: 'cards' | 'table' = 'cards';
-  private customStats: CustomStatEntry[] = [];
 
   private _pollInterval: ReturnType<typeof setInterval> | null = null;
   private _dataChangedHandler: (() => void) | null = null;
@@ -34,18 +33,16 @@ export class Scoreboard {
     this.match = (await getMatch(this.matchId)) ?? null;
     if (!this.match) return;
 
-    const [game, night, players, entries, customStats] = await Promise.all([
+    const [game, night, players, entries] = await Promise.all([
       db.games.get(this.match.gameId),
       getGameNight(this.match.gameNightId),
       db.players.where('id').anyOf(this.match.playerIds).toArray(),
       getScoreEntriesForMatch(this.matchId),
-      getCustomStatEntriesForMatch(this.matchId),
     ]);
 
     this.game = game ?? null;
     this.night = night ?? null;
     this.entries = entries;
-    this.customStats = customStats;
     this.players = this.match.playerIds
       .map(pid => players.find(p => p.id === pid))
       .filter((p): p is Player => p !== undefined);
@@ -214,14 +211,7 @@ export class Scoreboard {
     const bodyRows = rounds.map(r => {
       const cells = this.players.map(p => {
         const entry = this.entries.find(e => e.playerId === p.id && e.roundNumber === r);
-        const icons = (this.game?.customFields ?? [])
-          .filter(f => f.trigger === 'per-round' && f.icon)
-          .filter(f => this.customStats.some(s => s.fieldId === f.id && s.playerId === p.id && s.roundNumber === r))
-          .map(f => f.icon!)
-          .join('');
-        const content = entry != null
-          ? `${icons ? `<span class="sbt-icons">${icons}</span>` : ''}${entry.value}`
-          : '—';
+        const content = entry != null ? String(entry.value) : '—';
         return `<td class="sbt-cell">${content}</td>`;
       }).join('');
       return `<tr><td class="sbt-label">${this._esc(this._roundLabel(r))}</td>${cells}</tr>`;

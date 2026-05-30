@@ -1,11 +1,10 @@
 import {
   getMatch, getGameNight, getMatchesForNight, updateMatch,
-  addScoreEntry, getScoreEntriesForMatch, deleteLastScoreEntry,
-  addCustomStatEntry, getCustomStatEntriesForMatch, db
+  addScoreEntry, getScoreEntriesForMatch, deleteLastScoreEntry, db
 } from '../db';
 import { navigate } from '../router';
 import { showToast } from '../toast';
-import type { Match, Game, GameNight, Player, ScoreEntry, CustomStatEntry, CustomField } from '../types';
+import type { Match, Game, GameNight, Player, ScoreEntry } from '../types';
 
 interface PlayerScore {
   player: Player;
@@ -25,8 +24,6 @@ export class ActiveMatch {
   private nightMatches: Match[] = [];
   private nightMatchGames: Map<number, Game> = new Map();
   private tableView: boolean = false;
-  private customStats: CustomStatEntry[] = [];
-  private customFieldsExpanded: boolean = false;
 
   /** Return the display name for a 1-based round number. */
   private roundLabel(roundNumber: number): string {
@@ -42,20 +39,18 @@ export class ActiveMatch {
     this.match = (await getMatch(matchId)) ?? null;
     if (!this.match) return;
 
-    const [game, night, players, entries, nightMatches, customStats] = await Promise.all([
+    const [game, night, players, entries, nightMatches] = await Promise.all([
       db.games.get(this.match.gameId),
       getGameNight(this.match.gameNightId),
       db.players.where('id').anyOf(this.match.playerIds).toArray(),
       getScoreEntriesForMatch(matchId),
       getMatchesForNight(this.match.gameNightId),
-      getCustomStatEntriesForMatch(matchId),
     ]);
 
     this.game = game ?? null;
     this.night = night ?? null;
     this.entries = entries;
     this.nightMatches = nightMatches;
-    this.customStats = customStats;
 
     // Load game names for all matches in this night
     const gameIds = [...new Set(nightMatches.map(m => m.gameId))];
@@ -158,59 +153,6 @@ export class ActiveMatch {
     return this.match.playerIds[idx] ?? null;
   }
 
-  private renderCustomFieldInputs(trigger: 'per-round' | 'per-match'): string {
-    const fields = (this.game?.customFields ?? []).filter(f => f.trigger === trigger);
-    if (fields.length === 0) return '';
-
-    const inputsHtml = fields.map(f => {
-      const iconPrefix = f.icon ? `${f.icon} ` : '';
-      if (f.type === 'pick-one') {
-        return `<div class="form-group" style="margin-top:0.75rem">
-          <label class="form-label" style="font-size:0.8rem">${iconPrefix}${this.escHtml(f.label)} <span class="text-muted">(optional)</span></label>
-          <select class="form-select" id="cstat-${f.id}" data-field-id="${f.id}" style="min-height:38px">
-            <option value="">— none —</option>
-            ${this.players.map(p => `<option value="${p.id}">${this.escHtml(p.displayName)}</option>`).join('')}
-          </select>
-        </div>`;
-      }
-      if (f.scope === 'player') {
-        return `<div class="form-group" style="margin-top:0.75rem">
-          <label class="form-label" style="font-size:0.8rem">${iconPrefix}${this.escHtml(f.label)}</label>
-          <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.25rem">
-            ${this.players.map(p => `
-              <div style="display:flex; flex-direction:column; align-items:center; gap:2px">
-                <span class="text-xs text-muted">${this.escHtml(p.displayName)}</span>
-                <input class="score-input" type="number" id="cstat-${f.id}-${p.id}"
-                  data-field-id="${f.id}" data-player-id="${p.id}"
-                  placeholder="0" step="1" style="max-width:70px; text-align:center" />
-              </div>`).join('')}
-          </div>
-        </div>`;
-      }
-      return `<div class="form-group" style="margin-top:0.75rem">
-        <label class="form-label" style="font-size:0.8rem">${iconPrefix}${this.escHtml(f.label)}</label>
-        <input class="form-input" type="number" id="cstat-${f.id}"
-          data-field-id="${f.id}" placeholder="0" step="1" style="max-width:120px" />
-      </div>`;
-    }).join('');
-
-    if (fields.length <= 2) {
-      return `<div class="custom-stats-inline">${inputsHtml}</div>`;
-    }
-
-    return `<div class="custom-stats-inline">
-      <button type="button" class="custom-stats-expander" id="custom-stats-toggle">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-          ${this.customFieldsExpanded ? '<polyline points="18 15 12 9 6 15"/>' : '<polyline points="6 9 12 15 18 9"/>'}
-        </svg>
-        More stats (${fields.length})
-      </button>
-      <div id="custom-stats-body"${this.customFieldsExpanded ? '' : ' style="display:none"'}>
-        ${inputsHtml}
-      </div>
-    </div>`;
-  }
-
   private renderScoreTable(): string {
     if (this.players.length === 0 || this.entries.length === 0) {
       return `<div class="text-sm text-muted" style="padding:1rem 0; text-align:center">No scores yet — add a round to see the table.</div>`;
@@ -260,20 +202,17 @@ export class ActiveMatch {
         const entry = roundEntries.find(e => e.playerId === p.id);
         if (!entry) return `<td class="score-table-score">–</td>`;
         const editAttrs = `data-entry-id="${entry.id}" data-player-id="${p.id}" data-round="${rn}"`;
-        const statIcons = (this.game?.customFields ?? [])
-          .filter(f => f.trigger === 'per-round' && f.icon)
-          .filter(f => this.customStats.some(s => s.fieldId === f.id && s.playerId === p.id && s.roundNumber === rn))
-          .map(f => f.icon!)
-          .join('');
         if (isPhase10) {
           try {
-            const data = JSON.parse(entry.note ?? '{}') as { phase?: number; completed?: boolean };
+            const data = JSON.parse(entry.note ?? '{}') as { phase?: number; completed?: boolean; firstOut?: boolean };
             const phaseLabel = data.phase ? `Ph.${data.phase}` : '';
             const completedMark = data.completed ? ' ✓' : '';
-            return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${statIcons ? ' ' + statIcons : ''}<br><small>${entry.value}pts</small></td>`;
+            const foMark = data.firstOut ? ' ⚡' : '';
+            return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
           } catch { /* fall through */ }
         }
-        return `<td class="score-table-score score-cell-editable" ${editAttrs}>${statIcons ? statIcons + ' ' : ''}${entry.value}</td>`;
+        const firstOut = entry.note === 'first_out';
+        return `<td class="score-table-score score-cell-editable" ${editAttrs}>${firstOut ? '⚡ ' : ''}${entry.value}</td>`;
       }).join('');
 
       const runCells = this.players.map(p => {
@@ -369,7 +308,15 @@ export class ActiveMatch {
       `;
     }).join('');
 
-    const customFieldsHtml = this.renderCustomFieldInputs('per-round');
+    const firstOutSelector = `
+      <div class="form-group" style="margin-top:0.75rem">
+        <label class="form-label" for="first-out-select" style="font-size:0.8rem">Who went out first? <span class="text-muted">(optional)</span></label>
+        <select class="form-select" id="first-out-select" style="min-height:38px">
+          <option value="">— none / unknown —</option>
+          ${this.players.map(p => `<option value="${p.id}">${this.escHtml(p.displayName)}</option>`).join('')}
+        </select>
+      </div>
+    `;
 
     // Score input section (only for active matches)
     let inputSectionHtml = '';
@@ -419,7 +366,7 @@ export class ActiveMatch {
               <span class="round-badge">Phase 10</span>
             </div>
             ${playerRows}
-            ${customFieldsHtml}
+            ${firstOutSelector}
             <div class="btn-group mt-3">
               <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Save round">
                 ✓ Save Round
@@ -460,7 +407,7 @@ export class ActiveMatch {
             <div style="display:flex; flex-wrap:wrap; gap:0.75rem; justify-content:center; margin-bottom:0.5rem;">
               ${inputs}
             </div>
-            ${customFieldsHtml}
+            ${firstOutSelector}
             <div class="btn-group mt-2">
               <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Save round scores">
                 ✓ Add Round
@@ -534,7 +481,7 @@ export class ActiveMatch {
             <div style="margin-bottom:0.5rem">
               ${runningInputs}
             </div>
-            ${customFieldsHtml}
+            ${firstOutSelector}
             <div class="btn-group mt-2">
               <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Add scores">
                 ✓ Add Scores
@@ -726,23 +673,6 @@ export class ActiveMatch {
       });
     });
 
-    document.getElementById('custom-stats-toggle')?.addEventListener('click', () => {
-      this.customFieldsExpanded = !this.customFieldsExpanded;
-      const body = document.getElementById('custom-stats-body');
-      const toggle = document.getElementById('custom-stats-toggle');
-      if (body) body.style.display = this.customFieldsExpanded ? '' : 'none';
-      if (toggle) {
-        toggle.innerHTML = toggle.innerHTML.replace(
-          this.customFieldsExpanded
-            ? '<polyline points="6 9 12 15 18 9"/>'
-            : '<polyline points="18 15 12 9 6 15"/>',
-          this.customFieldsExpanded
-            ? '<polyline points="18 15 12 9 6 15"/>'
-            : '<polyline points="6 9 12 15 18 9"/>'
-        );
-      }
-    });
-
     // Enter key advances to next input in score grid
     document.querySelectorAll<HTMLInputElement>('.score-input').forEach((input, idx, all) => {
       input.addEventListener('keydown', (e) => {
@@ -763,13 +693,15 @@ export class ActiveMatch {
     const entries: { playerId: number; value: number; note?: string }[] = [];
 
     if (mode === 'phase10') {
+      const firstOutId = (document.getElementById('first-out-select') as HTMLSelectElement)?.value ?? '';
       for (const player of this.players) {
         const phase = this.getPlayerCurrentPhase(player);
         if (phase > 10) continue; // already completed all phases, skip
         const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
         const penaltyPts = parseFloat(input?.value ?? '0') || 0;
         const completed = (document.getElementById(`completed-${player.id}`) as HTMLInputElement)?.checked ?? false;
-        const note = JSON.stringify({ phase, completed });
+        const firstOut = firstOutId === String(player.id);
+        const note = JSON.stringify({ phase, completed, ...(firstOut ? { firstOut: true } : {}) });
         entries.push({ playerId: player.id!, value: penaltyPts, note });
       }
       if (entries.length === 0) {
@@ -794,10 +726,12 @@ export class ActiveMatch {
         entries.push({ playerId: player.id!, value: score });
       }
     } else {
+      const firstOutId = (document.getElementById('first-out-select') as HTMLSelectElement)?.value ?? '';
       for (const player of this.players) {
         const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
         const val = parseFloat(input?.value ?? '0') || 0;
-        entries.push({ playerId: player.id!, value: val });
+        const firstOut = firstOutId === String(player.id);
+        entries.push({ playerId: player.id!, value: val, ...(firstOut ? { note: 'first_out' } : {}) });
       }
     }
 
@@ -813,9 +747,6 @@ export class ActiveMatch {
           createdAt: now,
         });
       }
-
-      // Save per-round custom stat entries
-      await this._saveCustomStats('per-round', this.currentRound, now);
 
       showToast(`${this.roundLabel(this.currentRound)} saved`, 'success');
 
@@ -856,70 +787,12 @@ export class ActiveMatch {
     }
   }
 
-  private async _saveCustomStats(trigger: CustomField['trigger'], roundNumber: number | undefined, now: number): Promise<void> {
-    if (!this.match || !this.game) return;
-    const fields = (this.game.customFields ?? []).filter(f => f.trigger === trigger);
-    for (const f of fields) {
-      if (f.type === 'pick-one') {
-        const sel = document.getElementById(`cstat-${f.id}`) as HTMLSelectElement | null;
-        const pid = sel?.value ? parseInt(sel.value, 10) : null;
-        if (pid) {
-          await addCustomStatEntry({
-            matchId: this.matchId,
-            gameId: this.match.gameId,
-            fieldId: f.id,
-            playerId: pid,
-            roundNumber,
-            value: 1,
-            createdAt: now,
-          });
-        }
-      } else if (f.scope === 'player') {
-        for (const player of this.players) {
-          const input = document.getElementById(`cstat-${f.id}-${player.id}`) as HTMLInputElement | null;
-          const val = parseFloat(input?.value ?? '') || 0;
-          if (val !== 0) {
-            await addCustomStatEntry({
-              matchId: this.matchId,
-              gameId: this.match.gameId,
-              fieldId: f.id,
-              playerId: player.id!,
-              roundNumber,
-              value: val,
-              createdAt: now,
-            });
-          }
-        }
-      } else {
-        const input = document.getElementById(`cstat-${f.id}`) as HTMLInputElement | null;
-        const val = parseFloat(input?.value ?? '') || 0;
-        if (val !== 0) {
-          await addCustomStatEntry({
-            matchId: this.matchId,
-            gameId: this.match.gameId,
-            fieldId: f.id,
-            roundNumber,
-            value: val,
-            createdAt: now,
-          });
-        }
-      }
-    }
-  }
-
   private async handleFinishMatch(): Promise<void> {
     if (!this.match || !this.game) return;
 
     if (this.playerScores.length === 0) {
       showToast('Add at least one round before finishing', 'error');
       return;
-    }
-
-    // Collect per-match custom fields if any
-    const perMatchFields = (this.game.customFields ?? []).filter(f => f.trigger === 'per-match');
-    if (perMatchFields.length > 0) {
-      const collected = await this._collectPerMatchFields(perMatchFields);
-      if (!collected) return; // user cancelled
     }
 
     const winner = this.playerScores[0];
@@ -938,89 +811,6 @@ export class ActiveMatch {
       console.error('Failed to finish match:', err);
       showToast('Failed to finish match', 'error');
     }
-  }
-
-  private _collectPerMatchFields(fields: CustomField[]): Promise<boolean> {
-    return new Promise(resolve => {
-      document.getElementById('per-match-fields-modal')?.remove();
-
-      const overlay = document.createElement('div');
-      overlay.id = 'per-match-fields-modal';
-      overlay.className = 'modal-overlay';
-
-      const inputs = fields.map(f => {
-        if (f.type === 'pick-one') {
-          return `<div class="form-group">
-            <label class="form-label" style="font-size:0.85rem">${this.escHtml(f.label)}</label>
-            <select class="form-select" id="pm-cstat-${f.id}">
-              <option value="">— none —</option>
-              ${this.players.map(p => `<option value="${p.id}">${this.escHtml(p.displayName)}</option>`).join('')}
-            </select>
-          </div>`;
-        }
-        if (f.scope === 'player') {
-          return `<div class="form-group">
-            <label class="form-label" style="font-size:0.85rem">${this.escHtml(f.label)}</label>
-            <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.25rem">
-              ${this.players.map(p => `
-                <div style="display:flex; flex-direction:column; align-items:center; gap:2px">
-                  <span class="text-xs text-muted">${this.escHtml(p.displayName)}</span>
-                  <input class="score-input" type="number" id="pm-cstat-${f.id}-${p.id}"
-                    placeholder="0" step="1" style="max-width:70px; text-align:center" />
-                </div>`).join('')}
-            </div>
-          </div>`;
-        }
-        return `<div class="form-group">
-          <label class="form-label" style="font-size:0.85rem">${this.escHtml(f.label)}</label>
-          <input class="form-input" type="number" id="pm-cstat-${f.id}" placeholder="0" step="1" style="max-width:120px" />
-        </div>`;
-      }).join('');
-
-      overlay.innerHTML = `
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pm-modal-title">
-          <div class="modal-message">
-            <div id="pm-modal-title" style="font-weight:600; margin-bottom:1rem">Match Stats</div>
-            ${inputs}
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-secondary" id="pm-cancel-btn">Skip</button>
-            <button class="btn btn-primary" id="pm-save-btn">Save &amp; Finish</button>
-          </div>
-        </div>`;
-      document.body.appendChild(overlay);
-
-      overlay.querySelector('#pm-cancel-btn')?.addEventListener('click', () => {
-        overlay.remove();
-        resolve(true); // skip is OK, still finish
-      });
-
-      overlay.querySelector('#pm-save-btn')?.addEventListener('click', async () => {
-        const now = Date.now();
-        // Re-map field IDs to read from pm-cstat- prefixed elements
-        for (const f of fields) {
-          if (f.type === 'pick-one') {
-            const sel = document.getElementById(`pm-cstat-${f.id}`) as HTMLSelectElement | null;
-            const pid = sel?.value ? parseInt(sel.value, 10) : null;
-            if (pid) {
-              await addCustomStatEntry({ matchId: this.matchId, gameId: this.match!.gameId, fieldId: f.id, playerId: pid, value: 1, createdAt: now });
-            }
-          } else if (f.scope === 'player') {
-            for (const player of this.players) {
-              const input = document.getElementById(`pm-cstat-${f.id}-${player.id}`) as HTMLInputElement | null;
-              const val = parseFloat(input?.value ?? '') || 0;
-              if (val !== 0) await addCustomStatEntry({ matchId: this.matchId, gameId: this.match!.gameId, fieldId: f.id, playerId: player.id!, value: val, createdAt: now });
-            }
-          } else {
-            const input = document.getElementById(`pm-cstat-${f.id}`) as HTMLInputElement | null;
-            const val = parseFloat(input?.value ?? '') || 0;
-            if (val !== 0) await addCustomStatEntry({ matchId: this.matchId, gameId: this.match!.gameId, fieldId: f.id, value: val, createdAt: now });
-          }
-        }
-        overlay.remove();
-        resolve(true);
-      });
-    });
   }
 
   private showEditModal(entryId: number, currentValue: number, playerName: string, roundLbl: string): void {

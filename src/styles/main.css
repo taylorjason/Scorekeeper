@@ -2111,6 +2111,10 @@ button, input, select, textarea {
   color: #fbbf24;
   text-transform: uppercase;
 }
+.sb-leader-badge--ghost {
+  visibility: hidden;
+  pointer-events: none;
+}
 
 /* ─── Configure panel (player order + dealer) ────────────────────────────────── */
 .configure-panel-header {
@@ -2334,7 +2338,7 @@ button, input, select, textarea {
   border-radius: 16px;
   padding: clamp(1.32rem, 3vw, 2.4rem) clamp(1.5rem, 3.6vw, 3rem);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: clamp(1.2rem, 3vw, 2.1rem);
   border-left: 6px solid var(--pc, #6366f1);
   box-shadow: -2px 0 20px color-mix(in srgb, var(--pc, #6366f1) 25%, transparent);

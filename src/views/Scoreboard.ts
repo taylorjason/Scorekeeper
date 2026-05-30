@@ -186,7 +186,7 @@ export class Scoreboard {
 
       const leaderBadge = er === 0 && this.currentRound > 0
         ? `<div class="sb-leader-badge">${this.match?.status === 'completed' ? 'WINNER' : 'LEADER'}</div>`
-        : '';
+        : `<div class="sb-leader-badge sb-leader-badge--ghost"></div>`;
 
       let scoreHtml: string;
       if (isPhase10) {

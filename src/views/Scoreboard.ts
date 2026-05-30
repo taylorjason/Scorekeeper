@@ -1,17 +1,8 @@
 import { getMatch, getGameNight, getScoreEntriesForMatch, db } from '../db';
 import { navigate } from '../router';
 import { getRoomConfig, initFirebaseSync } from '../firebase-sync';
+import { escHtml, formatDuration, computeRoundDurations } from '../utils';
 import type { Match, Game, GameNight, Player, ScoreEntry } from '../types';
-
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
-  if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
-  return `${sec}s`;
-}
 
 interface PlayerScore {
   player: Player;
@@ -99,10 +90,6 @@ export class Scoreboard {
     } else {
       this.playerScores.sort((a, b) => b.total - a.total);
     }
-  }
-
-  private _esc(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   private _roundLabel(roundNumber: number): string {
@@ -229,28 +216,13 @@ export class Scoreboard {
           <div class="sb-rank-area">${medalHtml}</div>
           <div class="sb-player-body">
             <div class="sb-name">
-              ${this._esc(ps.player.displayName)}
+              ${escHtml(ps.player.displayName)}
               ${isDealer && this.match?.status !== 'completed' ? '<span class="sb-dealer-badge">🃏</span>' : ''}
             </div>
             ${scoreHtml}
           </div>
         </div>`;
     }).join('');
-  }
-
-  private _computeRoundDurations(): Map<number, number> {
-    const result = new Map<number, number>();
-    const matchStart = this.match?.createdAt ?? 0;
-    const roundNums = [...new Set(this.entries.map(e => e.roundNumber))].sort((a, b) => a - b);
-    for (const rn of roundNums) {
-      const roundEnd = Math.max(...this.entries.filter(e => e.roundNumber === rn).map(e => e.createdAt));
-      const prevEntries = this.entries.filter(e => e.roundNumber < rn);
-      const roundStart = prevEntries.length > 0
-        ? Math.max(...prevEntries.map(e => e.createdAt))
-        : matchStart;
-      result.set(rn, roundEnd - roundStart);
-    }
-    return result;
   }
 
   private _totalDuration(): number {
@@ -272,11 +244,11 @@ export class Scoreboard {
       <th class="sbt-corner"></th>
       ${this.players.map(p => `<th class="sbt-player-head" style="--pc:${p.color}">
         <span class="sbt-dot" style="background:${p.color}"></span>
-        ${this._esc(p.displayName)}
+        ${escHtml(p.displayName)}
       </th>`).join('')}
     </tr>`;
 
-    const roundDurations = this._computeRoundDurations();
+    const roundDurations = computeRoundDurations(this.entries, this.match?.createdAt ?? 0);
     const bodyRows = rounds.map(r => {
       const dur = roundDurations.get(r);
       const durHtml = dur !== undefined ? ` <span class="sbt-dur">${formatDuration(dur)}</span>` : '';
@@ -285,7 +257,7 @@ export class Scoreboard {
         const content = entry != null ? String(entry.value) : '—';
         return `<td class="sbt-cell">${content}</td>`;
       }).join('');
-      return `<tr><td class="sbt-label">${this._esc(this._roundLabel(r))}${durHtml}</td>${cells}</tr>`;
+      return `<tr><td class="sbt-label">${escHtml(this._roundLabel(r))}${durHtml}</td>${cells}</tr>`;
     }).join('');
 
     const totals = this.players.map(p => {
@@ -335,8 +307,8 @@ export class Scoreboard {
       <div class="scoreboard">
         <div class="sb-header">
           <div class="sb-header-left">
-            <div class="sb-game-name">${this._esc(this.game.name)}</div>
-            <div class="sb-night-name" id="sb-night-name">${this._esc(this.night.title)} · ${roundText}</div>
+            <div class="sb-game-name">${escHtml(this.game.name)}</div>
+            <div class="sb-night-name" id="sb-night-name">${escHtml(this.night.title)} · ${roundText}</div>
           </div>
           <div class="sb-header-right">
             ${viewToggle}
@@ -345,7 +317,7 @@ export class Scoreboard {
           </div>
         </div>
 
-        ${roundBannerText ? `<div class="sb-round-banner" id="sb-round-banner">${this._esc(roundBannerText)}</div>` : ''}
+        ${roundBannerText ? `<div class="sb-round-banner" id="sb-round-banner">${escHtml(roundBannerText)}</div>` : ''}
 
         <div class="sb-players" id="sb-players">
           ${cardsActive ? this._renderCards() : this._renderTableView()}

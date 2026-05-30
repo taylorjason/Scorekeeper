@@ -147,6 +147,37 @@ export class Scoreboard {
     const dealerId = this._currentDealerId();
     const effRanks = this._effectiveRanks();
 
+    // Compute per-player gap trend (only for round-based, non-phase10 games with ≥2 rounds)
+    const trendMap = new Map<number, number>(); // playerId → positive=improved, negative=worsened
+    if (!isPhase10 && this.currentRound >= 2) {
+      const prevRound = this.currentRound - 1;
+      const prevTotals = new Map<number, number>();
+      for (const p of this.players) {
+        prevTotals.set(
+          p.id!,
+          this.entries
+            .filter(e => e.playerId === p.id && e.roundNumber <= prevRound)
+            .reduce((s, e) => s + e.value, 0)
+        );
+      }
+
+      const prevTotalValues = [...prevTotals.values()];
+      const prevLeader = isLow ? Math.min(...prevTotalValues) : Math.max(...prevTotalValues);
+      const currentLeader = this.playerScores[0].total;
+
+      for (const ps of this.playerScores) {
+        const pid = ps.player.id!;
+        const prevGap = isLow
+          ? (prevTotals.get(pid) ?? 0) - prevLeader
+          : prevLeader - (prevTotals.get(pid) ?? 0);
+        const currentGap = isLow
+          ? ps.total - currentLeader
+          : currentLeader - ps.total;
+        const delta = prevGap - currentGap; // positive = gap shrank = improved
+        if (delta !== 0) trendMap.set(pid, delta);
+      }
+    }
+
     return this.playerScores.map((ps, i) => {
       const er = effRanks[i];
       const rankClass = er === 0 ? 'sb-rank-1' : er === 1 ? 'sb-rank-2' : er === 2 ? 'sb-rank-3' : '';
@@ -169,7 +200,11 @@ export class Scoreboard {
           const gap = isLow
             ? ps.total - this.playerScores[0].total
             : this.playerScores[0].total - ps.total;
-          if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '−'}${gap} behind</div>`;
+          const trend = trendMap.get(ps.player.id!);
+          const trendHtml = trend !== undefined
+            ? ` <span class="sb-trend ${trend > 0 ? 'sb-trend--up' : 'sb-trend--down'}">${trend > 0 ? '▲' : '▼'} ${Math.abs(trend)}</span>`
+            : '';
+          if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '−'}${gap} behind${trendHtml}</div>`;
           else if (gap === 0) gapHtml = `<div class="sb-gap sb-gap--tie">TIE</div>`;
         }
         scoreHtml = `

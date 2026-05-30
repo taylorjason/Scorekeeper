@@ -27,7 +27,8 @@ export class History {
   private allGames: Game[] = [];
   private filterPlayerId: number | null = null;
   private filterGameId: number | null = null;
-  private filterDateFrom: string = '';   // YYYY-MM-DD or ''
+  private filterDateFrom: string = '';
+  private filterDateTo: string = '';
   private sortOrder: 'desc' | 'asc' = 'desc';
 
   async load(): Promise<void> {
@@ -95,6 +96,9 @@ export class History {
     if (this.filterDateFrom) {
       result = result.filter(n => n.night.date >= this.filterDateFrom);
     }
+    if (this.filterDateTo) {
+      result = result.filter(n => n.night.date <= this.filterDateTo);
+    }
     if (this.sortOrder === 'asc') {
       result = [...result].reverse();
     }
@@ -127,12 +131,14 @@ export class History {
       )
     ].join('');
 
-    const gameFilterBtns = [
-      `<button class="tab-btn ${this.filterGameId === null ? 'active' : ''}" data-game-filter="null">All Games</button>`,
-      ...this.allGames.map(g =>
-        `<button class="tab-btn ${this.filterGameId === g.id ? 'active' : ''}" data-game-filter="${g.id}">${escHtml(g.name)}</button>`
-      )
-    ].join('');
+    const gameOptions = this.allGames.map(g =>
+      `<option value="${g.id}" ${this.filterGameId === g.id ? 'selected' : ''}>${escHtml(g.name)}</option>`
+    ).join('');
+
+    const datePresets: [string, string][] = [['', 'All'], ['30d', '30d'], ['3mo', '3mo'], ['6mo', '6mo'], ['1yr', '1yr']];
+    const activePreset = datePresets.find(([val]) =>
+      this.filterDateFrom === this.dateFromPreset(val) && !this.filterDateTo
+    )?.[0] ?? null;
 
     let nightsHtml = '';
     if (filtered.length === 0) {
@@ -158,18 +164,36 @@ export class History {
         <section class="mb-4" aria-label="Filters">
           <div class="section-title mb-2">Filter by Player</div>
           <div class="filter-bar" role="group" aria-label="Player filter">${playerFilterBtns}</div>
-          <div class="section-title mb-2 mt-4">Filter by Game</div>
-          <div class="filter-bar" role="group" aria-label="Game filter">${gameFilterBtns}</div>
-          <div class="section-title mb-2 mt-4">Date Range</div>
-          <div class="filter-bar" role="group" aria-label="Date range filter">
-            ${[['', 'All Time'], ['30d', 'Last 30d'], ['3mo', 'Last 3mo'], ['6mo', 'Last 6mo'], ['1yr', 'This Year']].map(([val, label]) =>
-              `<button class="tab-btn ${this.filterDateFrom === this.dateFromPreset(val) ? 'active' : ''}" data-date-preset="${val}">${label}</button>`
-            ).join('')}
-          </div>
-          <div style="display:flex;justify-content:flex-end;margin-top:0.75rem">
-            <button class="btn btn-secondary btn-sm" id="sort-toggle" aria-label="Toggle sort order">
-              ${this.sortOrder === 'desc' ? '↓ Newest First' : '↑ Oldest First'}
-            </button>
+
+          <div class="history-filter-row">
+            <div class="history-filter-group">
+              <div class="section-title mb-1">Game</div>
+              <select id="game-filter-select" class="form-input" style="min-width:0">
+                <option value="">All Games</option>
+                ${gameOptions}
+              </select>
+            </div>
+
+            <div class="history-filter-group" style="flex:2">
+              <div class="history-date-header">
+                <span class="section-title">Date Range</span>
+                <button class="btn btn-secondary btn-sm" id="sort-toggle" style="padding:2px 10px;font-size:0.75rem">
+                  ${this.sortOrder === 'desc' ? '↓ Newest' : '↑ Oldest'}
+                </button>
+              </div>
+              <div class="filter-bar mb-2" role="group" aria-label="Date presets" style="flex-wrap:nowrap;gap:0.3rem">
+                ${datePresets.map(([val, label]) =>
+                  `<button class="tab-btn ${activePreset === val ? 'active' : ''}" data-date-preset="${val}" style="padding:4px 10px;font-size:0.8rem">${label}</button>`
+                ).join('')}
+              </div>
+              <div style="display:flex;gap:0.5rem;align-items:center">
+                <input type="date" id="date-from" class="form-input" value="${this.filterDateFrom}"
+                  aria-label="From date" style="flex:1;min-width:0;padding:6px 8px;font-size:0.85rem">
+                <span style="color:var(--text-muted);flex-shrink:0;font-size:0.9rem">–</span>
+                <input type="date" id="date-to" class="form-input" value="${this.filterDateTo}"
+                  aria-label="To date" style="flex:1;min-width:0;padding:6px 8px;font-size:0.85rem">
+              </div>
+            </div>
           </div>
         </section>
 
@@ -430,21 +454,32 @@ export class History {
       });
     });
 
-    // Game filter buttons
-    document.querySelectorAll<HTMLButtonElement>('[data-game-filter]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = btn.dataset['gameFilter'];
-        this.filterGameId = val === 'null' ? null : parseInt(val ?? '', 10);
-        this.refreshList();
-      });
+    // Game dropdown
+    document.getElementById('game-filter-select')?.addEventListener('change', (e) => {
+      const val = (e.target as HTMLSelectElement).value;
+      this.filterGameId = val ? parseInt(val, 10) : null;
+      this.refreshList();
     });
 
     // Date preset buttons
     document.querySelectorAll<HTMLButtonElement>('[data-date-preset]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.filterDateFrom = this.dateFromPreset(btn.dataset['datePreset'] ?? '');
+        this.filterDateTo = '';
+        const toEl = document.getElementById('date-to') as HTMLInputElement | null;
+        if (toEl) toEl.value = '';
         this.refreshList();
       });
+    });
+
+    // From/to date inputs
+    document.getElementById('date-from')?.addEventListener('change', (e) => {
+      this.filterDateFrom = (e.target as HTMLInputElement).value;
+      this.refreshList();
+    });
+    document.getElementById('date-to')?.addEventListener('change', (e) => {
+      this.filterDateTo = (e.target as HTMLInputElement).value;
+      this.refreshList();
     });
 
     // Sort toggle
@@ -542,19 +577,24 @@ export class History {
       this.afterRender();
     }
 
-    // Update filter button active states
+    // Update filter active states
     document.querySelectorAll<HTMLButtonElement>('[data-player-filter]').forEach(btn => {
       const val = btn.dataset['playerFilter'];
       btn.classList.toggle('active', val === 'null' ? this.filterPlayerId === null : parseInt(val ?? '', 10) === this.filterPlayerId);
     });
-    document.querySelectorAll<HTMLButtonElement>('[data-game-filter]').forEach(btn => {
-      const val = btn.dataset['gameFilter'];
-      btn.classList.toggle('active', val === 'null' ? this.filterGameId === null : parseInt(val ?? '', 10) === this.filterGameId);
-    });
+    const gameSelect = document.getElementById('game-filter-select') as HTMLSelectElement | null;
+    if (gameSelect) gameSelect.value = this.filterGameId !== null ? String(this.filterGameId) : '';
+    const activePreset = ['', '30d', '3mo', '6mo', '1yr'].find(val =>
+      this.filterDateFrom === this.dateFromPreset(val) && !this.filterDateTo
+    ) ?? null;
     document.querySelectorAll<HTMLButtonElement>('[data-date-preset]').forEach(btn => {
-      btn.classList.toggle('active', this.filterDateFrom === this.dateFromPreset(btn.dataset['datePreset'] ?? ''));
+      btn.classList.toggle('active', btn.dataset['datePreset'] === activePreset);
     });
+    const fromEl = document.getElementById('date-from') as HTMLInputElement | null;
+    if (fromEl) fromEl.value = this.filterDateFrom;
+    const toEl = document.getElementById('date-to') as HTMLInputElement | null;
+    if (toEl) toEl.value = this.filterDateTo;
     const sortBtn = document.getElementById('sort-toggle');
-    if (sortBtn) sortBtn.textContent = this.sortOrder === 'desc' ? '↓ Newest First' : '↑ Oldest First';
+    if (sortBtn) sortBtn.textContent = this.sortOrder === 'desc' ? '↓ Newest' : '↑ Oldest';
   }
 }

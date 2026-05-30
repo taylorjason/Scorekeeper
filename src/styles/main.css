@@ -1927,6 +1927,19 @@ button, input, select, textarea {
   margin-left: 0.3em;
   opacity: 0.9;
 }
+.sb-leader-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(251, 191, 36, 0.18);
+  border: 1.5px solid rgba(251, 191, 36, 0.6);
+  border-radius: 999px;
+  padding: 0.2rem 1rem;
+  font-size: clamp(1.04rem, 2vw, 1.44rem);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: #fbbf24;
+  text-transform: uppercase;
+}
 
 /* ─── Configure panel (player order + dealer) ────────────────────────────────── */
 .configure-panel-header {
@@ -2014,7 +2027,7 @@ button, input, select, textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.25rem;
 }
 .sb-header-left { flex: 1; min-width: 0; }
 .sb-header-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }

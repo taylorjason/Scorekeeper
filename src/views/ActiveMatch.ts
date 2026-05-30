@@ -6,6 +6,16 @@ import { navigate } from '../router';
 import { showToast } from '../toast';
 import type { Match, Game, GameNight, Player, ScoreEntry } from '../types';
 
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
+  return `${sec}s`;
+}
+
 interface PlayerScore {
   player: Player;
   total: number;
@@ -23,6 +33,8 @@ export class ActiveMatch {
   private currentRound: number = 1;
   private nightMatches: Match[] = [];
   private tableView: boolean = false;
+  private _roundStartMs: number = 0;
+  private _timerInterval: ReturnType<typeof setInterval> | null = null;
 
   /** Return the display name for a 1-based round number. */
   private roundLabel(roundNumber: number): string {
@@ -60,6 +72,11 @@ export class ActiveMatch {
     this.currentRound = this.entries.length > 0
       ? Math.max(...this.entries.map(e => e.roundNumber)) + 1
       : 1;
+
+    // Start of the current (not-yet-submitted) round = end of the last completed round
+    this._roundStartMs = this.entries.length > 0
+      ? Math.max(...this.entries.map(e => e.createdAt))
+      : (this.match?.createdAt ?? Date.now());
   }
 
   /** For phase10 mode: return the current phase (1–10) for a player.
@@ -145,6 +162,21 @@ export class ActiveMatch {
     return this.match.playerIds[idx] ?? null;
   }
 
+  private _computeRoundDurations(): Map<number, number> {
+    const result = new Map<number, number>();
+    const matchStart = this.match?.createdAt ?? 0;
+    const roundNums = [...new Set(this.entries.map(e => e.roundNumber))].sort((a, b) => a - b);
+    for (const rn of roundNums) {
+      const roundEnd = Math.max(...this.entries.filter(e => e.roundNumber === rn).map(e => e.createdAt));
+      const prevEntries = this.entries.filter(e => e.roundNumber < rn);
+      const roundStart = prevEntries.length > 0
+        ? Math.max(...prevEntries.map(e => e.createdAt))
+        : matchStart;
+      result.set(rn, roundEnd - roundStart);
+    }
+    return result;
+  }
+
   private renderScoreTable(): string {
     if (this.players.length === 0 || this.entries.length === 0) {
       return `<div class="text-sm text-muted" style="padding:1rem 0; text-align:center">No scores yet — add a round to see the table.</div>`;
@@ -186,10 +218,14 @@ export class ActiveMatch {
       runningTotals.set(rn, new Map(cumulative));
     }
 
+    const roundDurations = this._computeRoundDurations();
+
     // Round rows — newest at top, each followed by its cumulative ∑ row
     let rows = '';
     for (const rn of roundNums) {
       const roundEntries = this.entries.filter(e => e.roundNumber === rn);
+      const dur = roundDurations.get(rn);
+      const durHtml = dur !== undefined ? ` <span class="score-table-dur">${formatDuration(dur)}</span>` : '';
       const scoreCells = this.players.map(p => {
         const entry = roundEntries.find(e => e.playerId === p.id);
         if (!entry) return `<td class="score-table-score">–</td>`;
@@ -213,7 +249,7 @@ export class ActiveMatch {
       }).join('');
 
       rows += `<tr class="score-table-round-row">
-        <td class="score-table-label">${this.escHtml(this.roundLabel(rn))}</td>
+        <td class="score-table-label">${this.escHtml(this.roundLabel(rn))}${durHtml}</td>
         ${scoreCells}
       </tr>
       <tr class="score-table-total-row">
@@ -573,6 +609,7 @@ export class ActiveMatch {
                 <span class="round-banner-label">Now scoring</span>
                 ${this.escHtml(this.roundLabel(this.currentRound))}
                 ${dealer ? `<span class="dealer-pill">🃏 ${this.escHtml(dealer.displayName)}</span>` : ''}
+                <span class="round-timer" id="round-timer-display" aria-label="Round elapsed time">⏱ ${formatDuration(Date.now() - this._roundStartMs)}</span>
               </div>`;
             })() : ''}
 
@@ -592,6 +629,15 @@ export class ActiveMatch {
   }
 
   afterRender(): void {
+    // Live round timer — tick every second while the match is active
+    const timerEl = document.getElementById('round-timer-display');
+    if (timerEl) {
+      const start = this._roundStartMs;
+      this._timerInterval = setInterval(() => {
+        timerEl.textContent = `⏱ ${formatDuration(Date.now() - start)}`;
+      }, 1000);
+    }
+
     document.getElementById('toggle-cards')?.addEventListener('click', () => {
       this.tableView = false;
       this.reRender();
@@ -861,6 +907,7 @@ export class ActiveMatch {
   }
 
   private reRender(): void {
+    if (this._timerInterval) { clearInterval(this._timerInterval); this._timerInterval = null; }
     const container = document.getElementById('view-container');
     if (!container) return;
     container.innerHTML = this.render();

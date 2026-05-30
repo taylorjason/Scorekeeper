@@ -45,6 +45,9 @@ export class Settings {
       <main class="view" aria-label="Settings">
         <header class="page-header">
           <h1 class="page-title">Settings</h1>
+          <p class="page-subtitle" style="font-size:0.75rem;opacity:0.6">
+            v${__APP_VERSION__} · build ${__BUILD_NUMBER__} · ${new Date(__BUILD_TIME__).toLocaleString()}
+          </p>
         </header>
 
         <!-- Players Section -->

@@ -1554,7 +1554,8 @@ button, input, select, textarea {
 }
 
 /* ─── Modal ─────────────────────────────────────────────────────────────────── */
-#add-match-modal {
+#add-match-modal,
+#score-table-modal {
   position: fixed;
   inset: 0;
   z-index: 200;

@@ -192,11 +192,11 @@ export class Settings {
               <button class="btn btn-secondary btn-full" id="import-btn">
                 📥 Import Data (JSON)
               </button>
-              <input type="file" id="import-file-input" accept=".json" style="display:none" aria-label="Import JSON file" />
+              <input type="file" id="import-file-input" accept=".json,.JSON,application/json" style="display:none" aria-label="Import JSON file" />
               <button class="btn btn-secondary btn-full" id="import-external-btn">
                 📥 Import External Game
               </button>
-              <input type="file" id="import-external-file-input" accept=".json,.txt" style="display:none" aria-label="Import external game file" />
+              <input type="file" id="import-external-file-input" accept=".json,.JSON,.txt,.TXT,application/json,text/plain" style="display:none" aria-label="Import external game file" />
               <div class="divider" style="margin: 0.25rem 0"></div>
               <button class="btn btn-danger btn-full" id="clear-data-btn">
                 🗑️ Clear All Data

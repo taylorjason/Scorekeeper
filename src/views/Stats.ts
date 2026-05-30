@@ -1,7 +1,23 @@
 import { db } from '../db';
 import { computePlayerStats, computeLeaderboard, computeGameStats } from '../stats';
-import { escHtml } from '../utils';
+import { escHtml, formatDuration } from '../utils';
+import { buildFactTable, runQuery, dateFromPreset, fieldLabel } from '../query-engine';
+import type { StatRow, StatQuery, StatResult, FieldKey, GroupKey, MetricFn } from '../query-engine';
+import type { Chart as ChartType } from 'chart.js';
 import type { Player, Game } from '../types';
+
+const QUICK_INSIGHTS: Array<{ id: string; label: string; query: StatQuery }> = [
+  { id: 'first-out', label: '⚡ First-Out Leaders',
+    query: { metric: 'count', field: 'isFirstOut', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'player' } },
+  { id: 'fastest',   label: '⏱ Fastest Rounds',
+    query: { metric: 'min', field: 'roundDuration', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'game' } },
+  { id: 'avg-score', label: '📊 Avg Round Score',
+    query: { metric: 'avg', field: 'value', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'player' } },
+  { id: 'wins',      label: '🏆 Win Leaders',
+    query: { metric: 'count', field: 'isWin', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'player' } },
+  { id: 'monthly',   label: '📅 Last 3 Months',
+    query: { metric: 'count', field: 'isWin', filters: { playerIds: [], gameIds: [], dateFrom: dateFromPreset('3mo') }, groupBy: 'month' } },
+];
 
 export class Stats {
   private players: Player[] = [];
@@ -10,26 +26,67 @@ export class Stats {
   private leaderboard: Awaited<ReturnType<typeof computeLeaderboard>> = [];
   private playerStats: Awaited<ReturnType<typeof computePlayerStats>> | null = null;
 
+  private activeMainTab: 'overview' | 'explorer' = 'overview';
+  private factTable: StatRow[] = [];
+  private currentQuery: StatQuery = QUICK_INSIGHTS[0].query;
+  private queryResults: StatResult[] | null = null;
+
+  private _winsChart: ChartType | null = null;
+  private _trendChart: ChartType | null = null;
+  private _explorerChart: ChartType | null = null;
+
   async load(): Promise<void> {
-    const [players, games, lb] = await Promise.all([
+    const [players, games, lb, factTable] = await Promise.all([
       db.players.toArray(),
       db.games.toArray(),
       computeLeaderboard(),
+      buildFactTable(),
     ]);
     this.players = players.filter(p => p.active);
     this.games = games;
     this.leaderboard = lb;
+    this.factTable = factTable;
 
     if (this.selectedPlayerId === null && this.players.length > 0) {
       this.selectedPlayerId = this.players[0].id!;
     }
-
     if (this.selectedPlayerId !== null) {
       this.playerStats = await computePlayerStats(this.selectedPlayerId);
     }
   }
 
   render(): string {
+    const overviewContent = this._renderOverview();
+
+    return `
+      <main class="view" aria-label="Statistics">
+        <header class="page-header">
+          <h1 class="page-title">Statistics</h1>
+        </header>
+
+        <div class="stats-main-tabs" role="tablist" aria-label="Stats sections">
+          <button class="stats-main-tab-btn ${this.activeMainTab === 'overview' ? 'active' : ''}"
+            id="stats-tab-overview" role="tab" aria-selected="${this.activeMainTab === 'overview'}"
+            aria-controls="stats-panel-overview">Overview</button>
+          <button class="stats-main-tab-btn ${this.activeMainTab === 'explorer' ? 'active' : ''}"
+            id="stats-tab-explorer" role="tab" aria-selected="${this.activeMainTab === 'explorer'}"
+            aria-controls="stats-panel-explorer">Explorer</button>
+        </div>
+
+        <div id="stats-panel-overview" role="tabpanel" aria-labelledby="stats-tab-overview"
+          ${this.activeMainTab !== 'overview' ? 'hidden' : ''}>
+          ${overviewContent}
+        </div>
+
+        <div id="stats-panel-explorer" role="tabpanel" aria-labelledby="stats-tab-explorer"
+          ${this.activeMainTab !== 'explorer' ? 'hidden' : ''}>
+          ${this._renderExplorerTab()}
+        </div>
+      </main>
+    `;
+  }
+
+  private _renderOverview(): string {
     const tabsHtml = this.players.map(p => `
       <button class="tab-btn ${this.selectedPlayerId === p.id ? 'active' : ''}"
         data-player-id="${p.id}" aria-selected="${this.selectedPlayerId === p.id}"
@@ -97,12 +154,7 @@ export class Stats {
             <h2 class="card-title mb-3" id="breakdown-heading">Game Breakdown</h2>
             <table class="leaderboard" aria-label="Game breakdown for selected player">
               <thead>
-                <tr>
-                  <th>Game</th>
-                  <th>Played</th>
-                  <th>Wins</th>
-                  <th>Avg Score</th>
-                </tr>
+                <tr><th>Game</th><th>Played</th><th>Wins</th><th>Avg Score</th></tr>
               </thead>
               <tbody>
                 ${stats.gameBreakdown.map(gb => `
@@ -126,26 +178,17 @@ export class Stats {
       `;
     }
 
-    // Leaderboard
     const leaderboardHtml = this.leaderboard.length === 0
       ? `<div class="text-sm text-muted" style="padding:1rem 0">No games played yet</div>`
       : `
         <table class="leaderboard" aria-label="Overall leaderboard">
           <thead>
-            <tr>
-              <th>#</th>
-              <th>Player</th>
-              <th>Wins</th>
-              <th>Played</th>
-              <th>Win %</th>
-            </tr>
+            <tr><th>#</th><th>Player</th><th>Wins</th><th>Played</th><th>Win %</th></tr>
           </thead>
           <tbody>
             ${this.leaderboard.map((entry, i) => `
               <tr class="${this.selectedPlayerId === entry.player.id ? 'highlighted-row' : ''}">
-                <td>
-                  ${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                </td>
+                <td>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</td>
                 <td>
                   <div class="flex items-center gap-2">
                     <span class="player-dot" style="background:${entry.player.color}"></span>
@@ -162,7 +205,6 @@ export class Stats {
         </table>
       `;
 
-    // Game stats section
     const gameStatsHtml = this.games.length > 0 ? `
       <section class="card mb-4" aria-labelledby="game-stats-heading">
         <h2 class="card-title mb-3" id="game-stats-heading">Game Overview</h2>
@@ -181,194 +223,407 @@ export class Stats {
     ` : '';
 
     return `
-      <main class="view" aria-label="Statistics">
-        <header class="page-header">
-          <h1 class="page-title">Statistics</h1>
-        </header>
+      <section class="mb-4" aria-label="Player tabs">
+        <div class="section-title mb-2">Select Player</div>
+        <div class="tabs" role="tablist" aria-label="Player selection">
+          ${tabsHtml}
+        </div>
+      </section>
 
-        <section class="mb-4" aria-label="Player tabs">
-          <div class="section-title mb-2">Select Player</div>
-          <div class="tabs" role="tablist" aria-label="Player selection">
-            ${tabsHtml}
+      <div id="player-stats-section">${playerStatsHtml}</div>
+
+      <section class="card mb-4" aria-labelledby="leaderboard-heading">
+        <h2 class="card-title mb-3" id="leaderboard-heading">Overall Leaderboard</h2>
+        ${leaderboardHtml}
+      </section>
+
+      ${gameStatsHtml}
+    `;
+  }
+
+  private _renderExplorerTab(): string {
+    const q = this.currentQuery;
+
+    const insightsHtml = QUICK_INSIGHTS.map(ins =>
+      `<button class="quick-insight-btn" data-insight="${ins.id}">${ins.label}</button>`
+    ).join('');
+
+    const playerOptions = `<option value="">All Players</option>` +
+      this.players.map(p =>
+        `<option value="${p.id}" ${q.filters.playerIds[0] === p.id ? 'selected' : ''}>${escHtml(p.displayName)}</option>`
+      ).join('');
+
+    const gameOptions = `<option value="">All Games</option>` +
+      this.games.map(g =>
+        `<option value="${g.id}" ${q.filters.gameIds[0] === g.id ? 'selected' : ''}>${escHtml(g.name)}</option>`
+      ).join('');
+
+    const DATE_PRESETS = [
+      { value: '',    label: 'All time' },
+      { value: '30d', label: 'Last 30 days' },
+      { value: '3mo', label: 'Last 3 months' },
+      { value: '6mo', label: 'Last 6 months' },
+      { value: '1yr', label: 'This year' },
+    ];
+    const activeDatePreset = DATE_PRESETS.find(p => p.value !== '' && dateFromPreset(p.value) === q.filters.dateFrom)?.value ?? '';
+    const dateOptions = DATE_PRESETS.map(p =>
+      `<option value="${p.value}" ${activeDatePreset === p.value ? 'selected' : ''}>${p.label}</option>`
+    ).join('');
+
+    const fieldOptions = [
+      { value: 'value',         label: 'Round Score' },
+      { value: 'roundDuration', label: 'Round Duration' },
+      { value: 'isFirstOut',    label: 'First-Out Events' },
+      { value: 'isWin',         label: 'Wins' },
+    ].map(o => `<option value="${o.value}" ${q.field === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+
+    const metricOptions = [
+      { value: 'count', label: 'Count' },
+      { value: 'avg',   label: 'Average' },
+      { value: 'sum',   label: 'Total' },
+      { value: 'min',   label: 'Minimum' },
+      { value: 'max',   label: 'Maximum' },
+    ].map(o => `<option value="${o.value}" ${q.metric === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+
+    const groupOptions = [
+      { value: 'none',   label: 'None (single value)' },
+      { value: 'player', label: 'By Player' },
+      { value: 'game',   label: 'By Game' },
+      { value: 'month',  label: 'By Month' },
+    ].map(o => `<option value="${o.value}" ${q.groupBy === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+
+    return `
+      <div class="explorer-wrap">
+        <section class="mb-4" aria-label="Quick insights">
+          <div class="section-title mb-2">Quick Insights</div>
+          <div class="quick-insights-row" role="group" aria-label="Quick insight shortcuts">
+            ${insightsHtml}
           </div>
         </section>
 
-        <div id="player-stats-section">
-          ${playerStatsHtml}
-        </div>
-
-        <section class="card mb-4" aria-labelledby="leaderboard-heading">
-          <h2 class="card-title mb-3" id="leaderboard-heading">Overall Leaderboard</h2>
-          ${leaderboardHtml}
+        <section class="query-builder card mb-4" aria-label="Custom query builder">
+          <div class="card-header">
+            <h2 class="card-title">Custom Query</h2>
+          </div>
+          <div class="qb-row">
+            <label class="qb-label" for="qb-metric">Show me</label>
+            <select class="form-select qb-select" id="qb-metric">${metricOptions}</select>
+            <span class="qb-of">of</span>
+            <select class="form-select qb-select" id="qb-field">${fieldOptions}</select>
+          </div>
+          <div class="qb-row">
+            <label class="qb-label" for="qb-player">Player</label>
+            <select class="form-select qb-select" id="qb-player">${playerOptions}</select>
+          </div>
+          <div class="qb-row">
+            <label class="qb-label" for="qb-game">Game</label>
+            <select class="form-select qb-select" id="qb-game">${gameOptions}</select>
+          </div>
+          <div class="qb-row">
+            <label class="qb-label" for="qb-date">Date</label>
+            <select class="form-select qb-select" id="qb-date">${dateOptions}</select>
+          </div>
+          <div class="qb-row">
+            <label class="qb-label" for="qb-groupby">Group by</label>
+            <select class="form-select qb-select" id="qb-groupby">${groupOptions}</select>
+          </div>
+          <button class="btn btn-primary mt-3 btn-full" id="qb-run-btn">▶ Run Query</button>
         </section>
 
-        ${gameStatsHtml}
-      </main>
+        <div id="explorer-results">${this._renderQueryResults()}</div>
+      </div>
+    `;
+  }
+
+  private _renderQueryResults(): string {
+    if (this.queryResults === null) {
+      return `<div class="explorer-empty">Pick an insight above or configure a query and click Run.</div>`;
+    }
+    if (this.queryResults.length === 0) {
+      return `<div class="explorer-empty">No data for these filters — try broadening the date range or removing filters.</div>`;
+    }
+
+    const q = this.currentQuery;
+    const isDuration = q.field === 'roundDuration';
+    const title = fieldLabel(q.field, q.metric);
+    const fmt = (v: number) => isDuration ? formatDuration(v) : String(v);
+
+    if (q.groupBy === 'none') {
+      const r = this.queryResults[0];
+      return `
+        <section class="card" aria-label="Query result">
+          <div class="card-header"><h2 class="card-title">${escHtml(title)}</h2></div>
+          <div class="stat-big-number">${fmt(r.value)}</div>
+          <div class="text-sm text-muted" style="text-align:center">${r.sampleSize} data point${r.sampleSize !== 1 ? 's' : ''}</div>
+        </section>
+      `;
+    }
+
+    const rowsHtml = this.queryResults.map((r, i) => `
+      <tr>
+        <td class="result-table-rank">${i + 1}</td>
+        <td>
+          ${r.color ? `<span class="player-dot" style="background:${r.color}"></span> ` : ''}
+          ${escHtml(r.label)}
+        </td>
+        <td class="result-table-val"><strong>${fmt(r.value)}</strong></td>
+        <td class="result-table-n text-muted">${r.sampleSize}</td>
+      </tr>
+    `).join('');
+
+    const chartHeight = Math.max(180, this.queryResults.length * 36 + 48);
+    const groupLabel = q.groupBy === 'player' ? 'Player' : q.groupBy === 'game' ? 'Game' : 'Month';
+
+    return `
+      <section class="card" aria-label="Query results">
+        <div class="card-header"><h2 class="card-title">${escHtml(title)}</h2></div>
+        <div class="chart-container" style="height:${chartHeight}px">
+          <canvas id="explorer-chart" aria-label="${escHtml(title)} chart" role="img"></canvas>
+        </div>
+        <table class="result-table" aria-label="${escHtml(title)} data table">
+          <thead>
+            <tr><th>#</th><th>${groupLabel}</th><th>Value</th><th title="Sample size">n</th></tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </section>
     `;
   }
 
   async afterRender(): Promise<void> {
-    // Render charts
-    if (this.playerStats && this.playerStats.gameBreakdown.length > 0) {
-      await this.renderWinsChart();
-    }
-    if (this.playerStats && this.playerStats.scoreTrend.length > 1) {
-      await this.renderTrendChart();
-    }
+    document.getElementById('stats-tab-overview')?.addEventListener('click', () => {
+      if (this.activeMainTab !== 'overview') { this.activeMainTab = 'overview'; this.reRender(); }
+    });
+    document.getElementById('stats-tab-explorer')?.addEventListener('click', () => {
+      if (this.activeMainTab !== 'explorer') { this.activeMainTab = 'explorer'; this.reRender(); }
+    });
 
-    // Load game stats
-    for (const game of this.games) {
-      this.loadGameStats(game);
-    }
+    if (this.activeMainTab === 'overview') {
+      if (this.playerStats?.gameBreakdown.length) await this.renderWinsChart();
+      if (this.playerStats && this.playerStats.scoreTrend.length > 1) await this.renderTrendChart();
+      for (const game of this.games) this.loadGameStats(game);
 
-    // Player tab clicks
-    document.querySelectorAll<HTMLButtonElement>('[data-player-id]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const pid = parseInt(btn.dataset['playerId'] ?? '', 10);
-        if (isNaN(pid)) return;
-        this.selectedPlayerId = pid;
-        this.playerStats = await computePlayerStats(pid);
+      document.querySelectorAll<HTMLButtonElement>('[data-player-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const pid = parseInt(btn.dataset['playerId'] ?? '', 10);
+          if (isNaN(pid)) return;
+          this.selectedPlayerId = pid;
+          this.playerStats = await computePlayerStats(pid);
+          this.reRender();
+        });
+      });
+    } else {
+      this._bindExplorer();
+      if (this.queryResults?.length && this.currentQuery.groupBy !== 'none') {
+        await this.renderExplorerChart();
+      }
+    }
+  }
+
+  private _bindExplorer(): void {
+    document.querySelectorAll<HTMLButtonElement>('.quick-insight-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ins = QUICK_INSIGHTS.find(i => i.id === btn.dataset['insight']);
+        if (!ins) return;
+        this.currentQuery = { ...ins.query };
+        this.queryResults = runQuery(this.factTable, this.currentQuery);
         this.reRender();
       });
     });
+
+    document.getElementById('qb-run-btn')?.addEventListener('click', () => {
+      this._readFormAndRun();
+    });
+  }
+
+  private _readFormAndRun(): void {
+    const metric    = ((document.getElementById('qb-metric')  as HTMLSelectElement)?.value ?? 'count') as MetricFn;
+    const field     = ((document.getElementById('qb-field')   as HTMLSelectElement)?.value ?? 'value') as FieldKey;
+    const groupBy   = ((document.getElementById('qb-groupby') as HTMLSelectElement)?.value ?? 'none') as GroupKey;
+    const playerRaw = (document.getElementById('qb-player') as HTMLSelectElement)?.value ?? '';
+    const gameRaw   = (document.getElementById('qb-game')   as HTMLSelectElement)?.value ?? '';
+    const datePreset = (document.getElementById('qb-date')  as HTMLSelectElement)?.value ?? '';
+
+    this.currentQuery = {
+      metric, field, groupBy,
+      filters: {
+        playerIds: playerRaw ? [parseInt(playerRaw, 10)] : [],
+        gameIds:   gameRaw   ? [parseInt(gameRaw,   10)] : [],
+        dateFrom:  dateFromPreset(datePreset),
+      },
+    };
+    this.queryResults = runQuery(this.factTable, this.currentQuery);
+    this.reRender();
+  }
+
+  private async renderExplorerChart(): Promise<void> {
+    const canvas = document.getElementById('explorer-chart') as HTMLCanvasElement | null;
+    if (!canvas || !this.queryResults?.length) return;
+
+    this._explorerChart?.destroy();
+    this._explorerChart = null;
+
+    try {
+      const { Chart, registerables } = await import('chart.js');
+      Chart.register(...registerables);
+
+      const q = this.currentQuery;
+      const isDuration = q.field === 'roundDuration';
+      const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+      const textColor = isDark ? '#94a3b8' : '#64748b';
+      const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
+      const labels = this.queryResults.map(r => r.label);
+      const values = this.queryResults.map(r => r.value);
+      const colors = this.queryResults.map(r => r.color ?? '#6366f1');
+      const durationTick = isDuration
+        ? { callback: (v: unknown) => formatDuration(Number(v)) }
+        : {};
+
+      if (q.groupBy === 'month') {
+        this._explorerChart = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: fieldLabel(q.field, q.metric),
+              data: values,
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99,102,241,0.15)',
+              borderWidth: 2, pointRadius: 4, fill: true, tension: 0.3,
+            }],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: textColor }, grid: { color: gridColor } },
+              y: { ticks: { color: textColor, ...durationTick }, grid: { color: gridColor } },
+            },
+          },
+        }) as ChartType;
+      } else {
+        this._explorerChart = new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: fieldLabel(q.field, q.metric),
+              data: values,
+              backgroundColor: colors.map(c => c + 'cc'),
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 4,
+            }],
+          },
+          options: {
+            indexAxis: 'y' as const,
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { color: textColor, ...durationTick }, grid: { color: gridColor } },
+              y: { ticks: { color: textColor }, grid: { color: gridColor } },
+            },
+          },
+        }) as ChartType;
+      }
+    } catch (err) {
+      console.warn('Chart.js failed to load:', err);
+    }
+  }
+
+  teardown(): void {
+    this._winsChart?.destroy();    this._winsChart = null;
+    this._trendChart?.destroy();   this._trendChart = null;
+    this._explorerChart?.destroy(); this._explorerChart = null;
   }
 
   private async loadGameStats(game: Game): Promise<void> {
     try {
       const stats = await computeGameStats(game.id!);
       const el = document.getElementById(`game-match-count-${game.id}`);
-      if (el) {
-        el.textContent = `${stats.totalMatches} match${stats.totalMatches !== 1 ? 'es' : ''}`;
-      }
-    } catch {
-      // ignore
-    }
+      if (el) el.textContent = `${stats.totalMatches} match${stats.totalMatches !== 1 ? 'es' : ''}`;
+    } catch { /* ignore */ }
   }
 
   private async renderWinsChart(): Promise<void> {
     const canvas = document.getElementById('wins-bar-chart') as HTMLCanvasElement | null;
     if (!canvas || !this.playerStats) return;
+    this._winsChart?.destroy(); this._winsChart = null;
 
     try {
       const { Chart, registerables } = await import('chart.js');
       Chart.register(...registerables);
 
-      const labels = this.playerStats.gameBreakdown.map(gb => gb.gameName);
-      const wins = this.playerStats.gameBreakdown.map(gb => gb.wins);
-      const losses = this.playerStats.gameBreakdown.map(gb => gb.losses);
-
       const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
       const textColor = isDark ? '#94a3b8' : '#64748b';
       const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
-      new Chart(canvas, {
+      this._winsChart = new Chart(canvas, {
         type: 'bar',
         data: {
-          labels,
+          labels: this.playerStats.gameBreakdown.map(gb => gb.gameName),
           datasets: [
-            {
-              label: 'Wins',
-              data: wins,
-              backgroundColor: 'rgba(16, 185, 129, 0.7)',
-              borderColor: '#10b981',
-              borderWidth: 1,
-              borderRadius: 6,
-            },
-            {
-              label: 'Losses',
-              data: losses,
-              backgroundColor: 'rgba(239, 68, 68, 0.5)',
-              borderColor: '#ef4444',
-              borderWidth: 1,
-              borderRadius: 6,
-            }
-          ]
+            { label: 'Wins',   data: this.playerStats.gameBreakdown.map(gb => gb.wins),
+              backgroundColor: 'rgba(16,185,129,0.8)', borderColor: '#10b981', borderWidth: 1, borderRadius: 4 },
+            { label: 'Losses', data: this.playerStats.gameBreakdown.map(gb => gb.losses),
+              backgroundColor: 'rgba(239,68,68,0.8)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 4 },
+          ],
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              labels: { color: textColor, font: { size: 12 } }
-            },
-          },
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: textColor, font: { size: 12 } } } },
           scales: {
-            x: {
-              ticks: { color: textColor },
-              grid: { color: gridColor },
-            },
-            y: {
-              beginAtZero: true,
-              ticks: { color: textColor, stepSize: 1 },
-              grid: { color: gridColor },
-            }
-          }
-        }
-      });
-    } catch (err) {
-      console.warn('Chart.js failed to load:', err);
-    }
+            x: { ticks: { color: textColor }, grid: { color: gridColor } },
+            y: { ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor }, beginAtZero: true },
+          },
+        },
+      }) as ChartType;
+    } catch (err) { console.warn('Chart.js failed to load:', err); }
   }
 
   private async renderTrendChart(): Promise<void> {
     const canvas = document.getElementById('score-line-chart') as HTMLCanvasElement | null;
     if (!canvas || !this.playerStats) return;
+    this._trendChart?.destroy(); this._trendChart = null;
 
     try {
       const { Chart, registerables } = await import('chart.js');
       Chart.register(...registerables);
 
-      const trend = this.playerStats.scoreTrend;
-      const labels = trend.map((_, i) => `Match ${i + 1}`);
-      const scores = trend.map(t => t.total);
-
       const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
       const textColor = isDark ? '#94a3b8' : '#64748b';
       const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
-      new Chart(canvas, {
+      this._trendChart = new Chart(canvas, {
         type: 'line',
         data: {
-          labels,
+          labels: this.playerStats.scoreTrend.map((_, i) => `Match ${i + 1}`),
           datasets: [{
             label: 'Score',
-            data: scores,
+            data: this.playerStats.scoreTrend.map(t => t.total),
             borderColor: '#6366f1',
             backgroundColor: 'rgba(99, 102, 241, 0.15)',
-            borderWidth: 2,
-            pointBackgroundColor: '#6366f1',
-            pointRadius: 4,
-            fill: true,
-            tension: 0.3,
-          }]
+            borderWidth: 2, pointBackgroundColor: '#6366f1', pointRadius: 4, fill: true, tension: 0.3,
+          }],
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-          },
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
           scales: {
-            x: {
-              ticks: { color: textColor },
-              grid: { color: gridColor },
-            },
-            y: {
-              ticks: { color: textColor },
-              grid: { color: gridColor },
-            }
-          }
-        }
-      });
-    } catch (err) {
-      console.warn('Chart.js failed to load:', err);
-    }
+            x: { ticks: { color: textColor }, grid: { color: gridColor } },
+            y: { ticks: { color: textColor }, grid: { color: gridColor } },
+          },
+        },
+      }) as ChartType;
+    } catch (err) { console.warn('Chart.js failed to load:', err); }
   }
 
   private reRender(): void {
+    this.teardown();
     const container = document.getElementById('view-container');
     if (!container) return;
     container.innerHTML = this.render();
-    this.afterRender();
+    void this.afterRender();
   }
 }

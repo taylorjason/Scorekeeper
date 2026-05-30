@@ -184,13 +184,18 @@ export class Scoreboard {
         ? `<span class="sb-medal">${medal}</span>`
         : `<span class="sb-rank-num">${medal}</span>`;
 
+      const leaderBadge = er === 0 && this.currentRound > 0
+        ? `<div class="sb-leader-badge">${this.match?.status === 'completed' ? 'WINNER' : 'LEADER'}</div>`
+        : '';
+
       let scoreHtml: string;
       if (isPhase10) {
         const phase = ps.phase ?? 1;
         const done = phase > 10;
         scoreHtml = `
           <div class="sb-phase">${done ? '🏆 Done' : `Phase ${phase}`}</div>
-          <div class="sb-penalty">${ps.total} pts</div>`;
+          <div class="sb-penalty">${ps.total} pts</div>
+          ${leaderBadge}`;
       } else {
         let gapHtml = '';
         if (er > 0 && this.playerScores.length > 1) {
@@ -207,7 +212,7 @@ export class Scoreboard {
         scoreHtml = `
           <div class="sb-score-area">
             <div class="sb-score">${ps.total}</div>
-            ${gapHtml}
+            ${gapHtml}${leaderBadge}
           </div>`;
       }
 

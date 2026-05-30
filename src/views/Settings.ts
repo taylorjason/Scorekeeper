@@ -3,6 +3,8 @@ import {
   getGames, createGame, updateGame, deleteGame,
   exportAll, importAll, db
 } from '../db';
+import { importExternalGame } from '../import-game';
+import type { ExternalGameData } from '../import-game';
 import { getSyncConfig, saveSyncConfig, testConnection, syncToGitHub, syncFromGitHub, validateSyncConfig } from '../github';
 import {
   getRoomConfig, saveRoomConfig, clearRoomConfig, generateRoomId,
@@ -199,6 +201,10 @@ export class Settings {
                 📥 Import Data (JSON)
               </button>
               <input type="file" id="import-file-input" accept=".json" style="display:none" aria-label="Import JSON file" />
+              <button class="btn btn-secondary btn-full" id="import-external-btn">
+                📥 Import External Game
+              </button>
+              <input type="file" id="import-external-file-input" accept=".json,.txt" style="display:none" aria-label="Import external game file" />
               <div class="divider" style="margin: 0.25rem 0"></div>
               <button class="btn btn-danger btn-full" id="clear-data-btn">
                 🗑️ Clear All Data
@@ -994,6 +1000,39 @@ export class Settings {
       } catch (err) {
         console.error(err);
         showToast('Import failed — invalid JSON', 'error');
+      }
+    });
+
+    document.getElementById('import-external-btn')?.addEventListener('click', () => {
+      document.getElementById('import-external-file-input')?.click();
+    });
+
+    document.getElementById('import-external-file-input')?.addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text) as ExternalGameData;
+        const summary = await importExternalGame(data);
+
+        const newMsg = summary.newPlayers.length > 0
+          ? ` (${summary.newPlayers.length} new player${summary.newPlayers.length > 1 ? 's' : ''}: ${summary.newPlayers.join(', ')})`
+          : '';
+        showToast(`Imported ${summary.gameName} on ${summary.date}: ${summary.playerCount} players, ${summary.roundCount} rounds${newMsg}`, 'success');
+
+        await this.load();
+        const playersEl = document.getElementById('players-list');
+        if (playersEl) playersEl.innerHTML = this.renderPlayersList();
+        const gamesEl = document.getElementById('games-list');
+        if (gamesEl) gamesEl.innerHTML = this.renderGamesList();
+        this.bindPlayerForm();
+        this.bindGameForm();
+      } catch (err) {
+        console.error(err);
+        showToast('Import failed — check the file format', 'error');
+      } finally {
+        (e.target as HTMLInputElement).value = '';
       }
     });
 

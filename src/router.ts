@@ -6,7 +6,8 @@ export type Route =
   | 'stats'
   | 'settings'
   | 'scoreboard'
-  | 'round-display';
+  | 'round-display'
+  | 'score-input';
 
 export interface ParsedRoute {
   route: Route;
@@ -41,6 +42,8 @@ export function parseRoute(hash: string): ParsedRoute {
       return { route: 'scoreboard', params: { id: parts[1] ?? '' } };
     case 'round-display':
       return { route: 'round-display', params: { id: parts[1] ?? '' } };
+    case 'score-input':
+      return { route: 'score-input', params: { id: parts[1] ?? '' } };
     default:
       return { route: 'dashboard', params: {} };
   }

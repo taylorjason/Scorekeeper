@@ -560,6 +560,11 @@ export class ActiveMatch {
             <div class="match-night-name">${escHtml(this.night.title)}</div>
           </div>
           ${isCompleted ? '<span class="badge badge-success">Done</span>' : '<span class="badge badge-primary">Live</span>'}
+          ${!isCompleted ? `<button class="btn btn-icon btn-sm" id="score-input-btn" aria-label="Mobile score input" title="Mobile Score Input">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>` : ''}
           <button class="btn btn-icon btn-sm" id="round-display-btn" aria-label="Show current round" title="Round Display">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -640,6 +645,11 @@ export class ActiveMatch {
     document.getElementById('back-to-dashboard')?.addEventListener('click', () => navigate('dashboard'));
     document.getElementById('back-btn')?.addEventListener('click', () => navigate('dashboard'));
     document.getElementById('back-to-night-btn')?.addEventListener('click', () => navigate('dashboard'));
+
+    document.getElementById('score-input-btn')?.addEventListener('click', () => {
+      const base = window.location.href.replace(/#.*$/, '');
+      window.open(`${base}#/score-input/${this.matchId}`, '_blank');
+    });
 
     document.getElementById('round-display-btn')?.addEventListener('click', () => {
       const base = window.location.href.replace(/#.*$/, '');

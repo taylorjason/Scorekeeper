@@ -16,6 +16,7 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
 
   document.body.classList.toggle('scoreboard-mode', parsed.route === 'scoreboard');
   document.body.classList.toggle('round-display-mode', parsed.route === 'round-display');
+  document.body.classList.toggle('score-input-mode', parsed.route === 'score-input');
 
   const container = document.getElementById('view-container');
   if (!container) return;
@@ -89,6 +90,14 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
       container.innerHTML = view.render();
       view.afterRender();
       _viewTeardown = () => view.teardown();
+      break;
+    }
+    case 'score-input': {
+      const { ScoreInput } = await import('./views/ScoreInput');
+      const view = new ScoreInput();
+      await view.load(Number(parsed.params.id));
+      container.innerHTML = view.render();
+      view.afterRender();
       break;
     }
   }

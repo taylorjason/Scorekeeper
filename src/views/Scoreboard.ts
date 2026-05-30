@@ -1,6 +1,7 @@
 import { getMatch, getGameNight, getScoreEntriesForMatch, db } from '../db';
 import { navigate } from '../router';
 import { getRoomConfig, initFirebaseSync } from '../firebase-sync';
+import { escHtml, formatDuration, computeRoundDurations } from '../utils';
 import type { Match, Game, GameNight, Player, ScoreEntry } from '../types';
 
 interface PlayerScore {
@@ -91,10 +92,6 @@ export class Scoreboard {
     }
   }
 
-  private _esc(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   private _roundLabel(roundNumber: number): string {
     const labels = this.game?.roundLabels;
     if (labels && labels.length >= roundNumber) return labels[roundNumber - 1];
@@ -147,6 +144,37 @@ export class Scoreboard {
     const dealerId = this._currentDealerId();
     const effRanks = this._effectiveRanks();
 
+    // Compute per-player gap trend (only for round-based, non-phase10 games with ≥2 rounds)
+    const trendMap = new Map<number, number>(); // playerId → positive=improved, negative=worsened
+    if (!isPhase10 && this.currentRound >= 2) {
+      const prevRound = this.currentRound - 1;
+      const prevTotals = new Map<number, number>();
+      for (const p of this.players) {
+        prevTotals.set(
+          p.id!,
+          this.entries
+            .filter(e => e.playerId === p.id && e.roundNumber <= prevRound)
+            .reduce((s, e) => s + e.value, 0)
+        );
+      }
+
+      const prevTotalValues = [...prevTotals.values()];
+      const prevLeader = isLow ? Math.min(...prevTotalValues) : Math.max(...prevTotalValues);
+      const currentLeader = this.playerScores[0].total;
+
+      for (const ps of this.playerScores) {
+        const pid = ps.player.id!;
+        const prevGap = isLow
+          ? (prevTotals.get(pid) ?? 0) - prevLeader
+          : prevLeader - (prevTotals.get(pid) ?? 0);
+        const currentGap = isLow
+          ? ps.total - currentLeader
+          : currentLeader - ps.total;
+        const delta = prevGap - currentGap; // positive = gap shrank = improved
+        if (delta !== 0) trendMap.set(pid, delta);
+      }
+    }
+
     return this.playerScores.map((ps, i) => {
       const er = effRanks[i];
       const rankClass = er === 0 ? 'sb-rank-1' : er === 1 ? 'sb-rank-2' : er === 2 ? 'sb-rank-3' : '';
@@ -174,7 +202,11 @@ export class Scoreboard {
           const gap = isLow
             ? ps.total - this.playerScores[0].total
             : this.playerScores[0].total - ps.total;
-          if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '−'}${gap} behind</div>`;
+          const trend = trendMap.get(ps.player.id!);
+          const trendHtml = trend !== undefined
+            ? ` <span class="sb-trend ${trend > 0 ? 'sb-trend--up' : 'sb-trend--down'}">${trend > 0 ? '▲' : '▼'} ${Math.abs(trend)}</span>`
+            : '';
+          if (gap > 0) gapHtml = `<div class="sb-gap">${isLow ? '+' : '−'}${gap} behind${trendHtml}</div>`;
           else if (gap === 0) gapHtml = `<div class="sb-gap sb-gap--tie">TIE</div>`;
         }
         scoreHtml = `
@@ -189,13 +221,21 @@ export class Scoreboard {
           <div class="sb-rank-area">${medalHtml}</div>
           <div class="sb-player-body">
             <div class="sb-name">
-              ${this._esc(ps.player.displayName)}
+              ${escHtml(ps.player.displayName)}
               ${isDealer && this.match?.status !== 'completed' ? '<span class="sb-dealer-badge">🃏</span>' : ''}
             </div>
             ${scoreHtml}
           </div>
         </div>`;
     }).join('');
+  }
+
+  private _totalDuration(): number {
+    const start = this.match?.createdAt ?? Date.now();
+    if (this.match?.status === 'completed' && this.entries.length > 0) {
+      return Math.max(...this.entries.map(e => e.createdAt)) - start;
+    }
+    return Date.now() - start;
   }
 
   private _renderTableView(): string {
@@ -209,16 +249,20 @@ export class Scoreboard {
       <th class="sbt-corner"></th>
       ${this.players.map(p => `<th class="sbt-player-head" style="--pc:${p.color}">
         <span class="sbt-dot" style="background:${p.color}"></span>
-        ${this._esc(p.displayName)}
+        ${escHtml(p.displayName)}
       </th>`).join('')}
     </tr>`;
 
+    const roundDurations = computeRoundDurations(this.entries, this.match?.createdAt ?? 0);
     const bodyRows = rounds.map(r => {
+      const dur = roundDurations.get(r);
+      const durHtml = dur !== undefined ? ` <span class="sbt-dur">${formatDuration(dur)}</span>` : '';
       const cells = this.players.map(p => {
         const entry = this.entries.find(e => e.playerId === p.id && e.roundNumber === r);
-        return `<td class="sbt-cell">${entry != null ? entry.value : '—'}</td>`;
+        const content = entry != null ? String(entry.value) : '—';
+        return `<td class="sbt-cell">${content}</td>`;
       }).join('');
-      return `<tr><td class="sbt-label">${this._esc(this._roundLabel(r))}</td>${cells}</tr>`;
+      return `<tr><td class="sbt-label">${escHtml(this._roundLabel(r))}${durHtml}</td>${cells}</tr>`;
     }).join('');
 
     const totals = this.players.map(p => {
@@ -268,8 +312,8 @@ export class Scoreboard {
       <div class="scoreboard">
         <div class="sb-header">
           <div class="sb-header-left">
-            <div class="sb-game-name">${this._esc(this.game.name)}</div>
-            <div class="sb-night-name" id="sb-night-name">${this._esc(this.night.title)} · ${roundText}</div>
+            <div class="sb-game-name">${escHtml(this.game.name)}</div>
+            <div class="sb-night-name" id="sb-night-name">${escHtml(this.night.title)} · ${roundText}</div>
           </div>
           <div class="sb-header-right">
             ${viewToggle}
@@ -278,14 +322,14 @@ export class Scoreboard {
           </div>
         </div>
 
-        ${roundBannerText ? `<div class="sb-round-banner" id="sb-round-banner">${this._esc(roundBannerText)}</div>` : ''}
+        ${roundBannerText ? `<div class="sb-round-banner" id="sb-round-banner">${escHtml(roundBannerText)}</div>` : ''}
 
         <div class="sb-players" id="sb-players">
           ${cardsActive ? this._renderCards() : this._renderTableView()}
         </div>
 
         <div class="sb-footer" id="sb-footer">
-          Updated ${this.lastUpdated.toLocaleTimeString()}
+          Updated ${this.lastUpdated.toLocaleTimeString()} · ${formatDuration(this._totalDuration())} total
         </div>
       </div>`;
   }
@@ -353,7 +397,7 @@ export class Scoreboard {
     if (roundBanner) roundBanner.textContent = this._currentRoundBannerText();
 
     const footer = document.getElementById('sb-footer');
-    if (footer) footer.textContent = `Updated ${this.lastUpdated.toLocaleTimeString()}`;
+    if (footer) footer.textContent = `Updated ${this.lastUpdated.toLocaleTimeString()} · ${formatDuration(this._totalDuration())} total`;
   }
 
   teardown(): void {

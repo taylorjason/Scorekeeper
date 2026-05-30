@@ -11,7 +11,18 @@ export class ScorekeeperDB extends Dexie {
 
   constructor() {
     super('ScorekeeperDB');
+    // Dexie v3 multiplies declared versions by 10 internally (version 1 → IDB 10,
+    // version 2 → IDB 20). Keep version 1 so existing IDB-10 browsers upgrade
+    // cleanly, and add version 2 so browsers already at IDB-20 open without error.
     this.version(1).stores({
+      players: '++id, displayName, active, createdAt',
+      games: '++id, name, scoringMode, createdAt',
+      gameNights: '++id, date, createdAt',
+      matches: '++id, gameNightId, gameId, status, winnerId, createdAt',
+      scoreEntries: '++id, matchId, playerId, roundNumber, createdAt',
+      statSnapshots: '++id, playerId, gameId, lastPlayed',
+    });
+    this.version(2).stores({
       players: '++id, displayName, active, createdAt',
       games: '++id, name, scoringMode, createdAt',
       gameNights: '++id, date, createdAt',
@@ -155,16 +166,13 @@ export async function deleteLastScoreEntry(matchId: number): Promise<boolean> {
     .sortBy('createdAt');
   if (entries.length === 0) return false;
 
-  // Find the max round number
   const maxRound = Math.max(...entries.map(e => e.roundNumber));
 
-  // Delete all entries for that round
   const toDelete = entries.filter(e => e.roundNumber === maxRound);
   for (const entry of toDelete) {
-    if (entry.id !== undefined) {
-      await db.scoreEntries.delete(entry.id);
-    }
+    if (entry.id !== undefined) await db.scoreEntries.delete(entry.id);
   }
+
   notifyChange();
   return true;
 }

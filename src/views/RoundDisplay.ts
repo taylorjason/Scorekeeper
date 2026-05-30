@@ -1,6 +1,7 @@
 import { getMatch, getScoreEntriesForMatch, db } from '../db';
 import { navigate } from '../router';
 import { getRoomConfig, initFirebaseSync } from '../firebase-sync';
+import { escHtml } from '../utils';
 import type { Match, Game } from '../types';
 
 export class RoundDisplay {
@@ -53,10 +54,6 @@ export class RoundDisplay {
     };
   }
 
-  private _esc(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   render(): string {
     if (!this.match || !this.game) {
       return `<div class="rd-screen"><p class="rd-error">Match not found</p></div>`;
@@ -69,9 +66,9 @@ export class RoundDisplay {
       <div class="rd-screen">
         <button class="rd-close" id="rd-close" aria-label="Close">✕</button>
         <div class="rd-inner">
-          <div class="rd-game-name">${this._esc(this.game.name)}</div>
+          <div class="rd-game-name">${escHtml(this.game.name)}</div>
           <div class="rd-headline" id="rd-headline">
-            ${isCompleted ? 'Game Over' : this._esc(headline)}
+            ${isCompleted ? 'Game Over' : escHtml(headline)}
           </div>
           <div class="rd-updated" id="rd-updated">Updated ${this.lastUpdated.toLocaleTimeString()}</div>
         </div>

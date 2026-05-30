@@ -4,6 +4,7 @@ import {
 } from '../db';
 import { navigate } from '../router';
 import { showToast } from '../toast';
+import { escHtml, formatDuration, computeRoundDurations } from '../utils';
 import type { Match, Game, GameNight, Player, ScoreEntry } from '../types';
 
 interface PlayerScore {
@@ -22,7 +23,10 @@ export class ActiveMatch {
   private playerScores: PlayerScore[] = [];
   private currentRound: number = 1;
   private nightMatches: Match[] = [];
+  private nightMatchGames: Map<number, Game> = new Map();
   private tableView: boolean = false;
+  private _roundStartMs: number = 0;
+  private _timerInterval: ReturnType<typeof setInterval> | null = null;
 
   /** Return the display name for a 1-based round number. */
   private roundLabel(roundNumber: number): string {
@@ -51,6 +55,13 @@ export class ActiveMatch {
     this.entries = entries;
     this.nightMatches = nightMatches;
 
+    // Load game names for all matches in this night
+    const gameIds = [...new Set(nightMatches.map(m => m.gameId))];
+    const nightGames = gameIds.length > 0
+      ? await db.games.where('id').anyOf(gameIds).toArray()
+      : [];
+    this.nightMatchGames = new Map(nightGames.map(g => [g.id!, g]));
+
     // Sort players to match the match.playerIds order
     this.players = this.match.playerIds.map(pid =>
       players.find(p => p.id === pid)
@@ -60,6 +71,11 @@ export class ActiveMatch {
     this.currentRound = this.entries.length > 0
       ? Math.max(...this.entries.map(e => e.roundNumber)) + 1
       : 1;
+
+    // Start of the current (not-yet-submitted) round = end of the last completed round
+    this._roundStartMs = this.entries.length > 0
+      ? Math.max(...this.entries.map(e => e.createdAt))
+      : (this.match?.createdAt ?? Date.now());
   }
 
   /** For phase10 mode: return the current phase (1–10) for a player.
@@ -121,10 +137,6 @@ export class ActiveMatch {
     return '';
   }
 
-  private escHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   private _effectiveRanks(): number[] {
     const ranks: number[] = [];
     for (let i = 0; i < this.playerScores.length; i++) {
@@ -161,7 +173,7 @@ export class ActiveMatch {
       `<th style="background:${p.color}22; border-bottom: 2px solid ${p.color}">
         <div class="flex items-center gap-1 justify-center">
           <span class="player-dot" style="background:${p.color}; flex-shrink:0"></span>
-          <span>${this.escHtml(p.displayName)}</span>
+          <span>${escHtml(p.displayName)}</span>
           ${p.id === dealerId ? '<span class="dealer-badge" title="Current dealer">🃏</span>' : ''}
         </div>
       </th>`
@@ -186,14 +198,17 @@ export class ActiveMatch {
       runningTotals.set(rn, new Map(cumulative));
     }
 
+    const roundDurations = computeRoundDurations(this.entries, this.match?.createdAt ?? 0);
+
     // Round rows — newest at top, each followed by its cumulative ∑ row
     let rows = '';
     for (const rn of roundNums) {
       const roundEntries = this.entries.filter(e => e.roundNumber === rn);
+      const dur = roundDurations.get(rn);
+      const durHtml = dur !== undefined ? ` <span class="score-table-dur">${formatDuration(dur)}</span>` : '';
       const scoreCells = this.players.map(p => {
         const entry = roundEntries.find(e => e.playerId === p.id);
         if (!entry) return `<td class="score-table-score">–</td>`;
-        const firstOut = entry.note === 'first_out';
         const editAttrs = `data-entry-id="${entry.id}" data-player-id="${p.id}" data-round="${rn}"`;
         if (isPhase10) {
           try {
@@ -204,6 +219,7 @@ export class ActiveMatch {
             return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
           } catch { /* fall through */ }
         }
+        const firstOut = entry.note === 'first_out';
         return `<td class="score-table-score score-cell-editable" ${editAttrs}>${firstOut ? '⚡ ' : ''}${entry.value}</td>`;
       }).join('');
 
@@ -213,7 +229,7 @@ export class ActiveMatch {
       }).join('');
 
       rows += `<tr class="score-table-round-row">
-        <td class="score-table-label">${this.escHtml(this.roundLabel(rn))}</td>
+        <td class="score-table-label">${escHtml(this.roundLabel(rn))}${durHtml}</td>
         ${scoreCells}
       </tr>
       <tr class="score-table-total-row">
@@ -275,38 +291,37 @@ export class ActiveMatch {
         const phase = this.getPlayerCurrentPhase(ps.player);
         const isDone = phase > 10;
         return `
-          <div class="score-card ${this.rankClass(er)}" aria-label="${this.escHtml(ps.player.displayName)}: Phase ${isDone ? '10 done' : phase}, ${ps.total} pts">
+          <div class="score-card ${this.rankClass(er)}" aria-label="${escHtml(ps.player.displayName)}: Phase ${isDone ? '10 done' : phase}, ${ps.total} pts">
             ${er < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(er)}</span>` : ''}
             ${isDealer ? '<span class="dealer-badge dealer-badge--card" title="Current dealer">🃏</span>' : ''}
             <div class="player-avatar" style="background:${ps.player.color}">
               ${ps.player.displayName.charAt(0).toUpperCase()}
             </div>
-            <div class="player-name">${this.escHtml(ps.player.displayName)}</div>
+            <div class="player-name">${escHtml(ps.player.displayName)}</div>
             <div class="score-total" style="font-size:1.1rem">${isDone ? '🏆 Done' : `Ph.${phase}`}</div>
             <div class="text-xs text-muted">${ps.total} penalty pts</div>
           </div>
         `;
       }
       return `
-        <div class="score-card ${this.rankClass(er)}" aria-label="${this.escHtml(ps.player.displayName)}: ${ps.total} points">
+        <div class="score-card ${this.rankClass(er)}" aria-label="${escHtml(ps.player.displayName)}: ${ps.total} points">
           ${er < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(er)}</span>` : ''}
           ${isDealer ? '<span class="dealer-badge dealer-badge--card" title="Current dealer">🃏</span>' : ''}
           <div class="player-avatar" style="background:${ps.player.color}">
             ${ps.player.displayName.charAt(0).toUpperCase()}
           </div>
-          <div class="player-name">${this.escHtml(ps.player.displayName)}</div>
+          <div class="player-name">${escHtml(ps.player.displayName)}</div>
           <div class="score-total" aria-label="${ps.total} points">${ps.total}</div>
         </div>
       `;
     }).join('');
 
-    // "Who went out first?" selector — reused in multiple modes
     const firstOutSelector = `
       <div class="form-group" style="margin-top:0.75rem">
         <label class="form-label" for="first-out-select" style="font-size:0.8rem">Who went out first? <span class="text-muted">(optional)</span></label>
         <select class="form-select" id="first-out-select" style="min-height:38px">
           <option value="">— none / unknown —</option>
-          ${this.players.map(p => `<option value="${p.id}">${this.escHtml(p.displayName)}</option>`).join('')}
+          ${this.players.map(p => `<option value="${p.id}">${escHtml(p.displayName)}</option>`).join('')}
         </select>
       </div>
     `;
@@ -323,7 +338,7 @@ export class ActiveMatch {
               <div class="phase10-player-row" style="opacity:0.6">
                 <div class="flex items-center gap-2">
                   <span class="player-dot" style="background:${p.color}"></span>
-                  <span class="font-semibold">${this.escHtml(p.displayName)}</span>
+                  <span class="font-semibold">${escHtml(p.displayName)}</span>
                   <span class="phase10-badge phase10-done">All phases done 🏆</span>
                 </div>
               </div>
@@ -333,7 +348,7 @@ export class ActiveMatch {
             <div class="phase10-player-row">
               <div class="flex items-center gap-2 mb-1">
                 <span class="player-dot" style="background:${p.color}"></span>
-                <span class="font-semibold">${this.escHtml(p.displayName)}</span>
+                <span class="font-semibold">${escHtml(p.displayName)}</span>
                 <span class="phase10-badge">Phase ${phase}</span>
               </div>
               <div class="flex items-center gap-3 flex-wrap">
@@ -341,7 +356,7 @@ export class ActiveMatch {
                   <span class="text-xs text-muted">Penalty pts</span>
                   <input class="score-input" type="number" id="score-input-${p.id}" data-player-id="${p.id}"
                     placeholder="0" min="0" step="5" style="max-width:80px; text-align:center"
-                    aria-label="${this.escHtml(p.displayName)} penalty points" />
+                    aria-label="${escHtml(p.displayName)} penalty points" />
                 </div>
                 <label class="flex items-center gap-2" style="cursor:pointer; padding: 4px 0">
                   <input type="checkbox" id="completed-${p.id}" style="width:18px; height:18px">
@@ -376,7 +391,7 @@ export class ActiveMatch {
           <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
             <div class="flex items-center gap-1">
               <span class="player-dot" style="background:${p.color}"></span>
-              <span class="text-xs font-semibold">${this.escHtml(p.displayName)}</span>
+              <span class="text-xs font-semibold">${escHtml(p.displayName)}</span>
             </div>
             <input
               class="score-input"
@@ -384,7 +399,7 @@ export class ActiveMatch {
               id="score-input-${p.id}"
               data-player-id="${p.id}"
               placeholder="0"
-              aria-label="${this.escHtml(p.displayName)} score"
+              aria-label="${escHtml(p.displayName)} score"
               step="1"
               style="max-width: 90px;"
             />
@@ -416,9 +431,9 @@ export class ActiveMatch {
         const orderInputs = this.players.map(p => `
           <div class="flex items-center gap-3 mb-2">
             <span class="player-dot player-dot-lg" style="background:${p.color}"></span>
-            <span class="font-semibold flex-1">${this.escHtml(p.displayName)}</span>
+            <span class="font-semibold flex-1">${escHtml(p.displayName)}</span>
             <select class="form-select" style="max-width:120px; min-height:42px"
-              id="order-input-${p.id}" data-player-id="${p.id}" aria-label="${this.escHtml(p.displayName)} position">
+              id="order-input-${p.id}" data-player-id="${p.id}" aria-label="${escHtml(p.displayName)} position">
               <option value="">Place</option>
               ${this.players.map((_, i) => `<option value="${i + 1}">${i + 1}${['st','nd','rd'][i] || 'th'}</option>`).join('')}
             </select>
@@ -448,7 +463,7 @@ export class ActiveMatch {
           return `
             <div class="flex items-center gap-3 mb-2">
               <span class="player-dot player-dot-lg" style="background:${p.color}"></span>
-              <span class="font-semibold flex-1">${this.escHtml(p.displayName)}</span>
+              <span class="font-semibold flex-1">${escHtml(p.displayName)}</span>
               <span class="text-sm text-muted" style="min-width:40px; text-align:right">=${current}</span>
               <input
                 class="score-input"
@@ -458,7 +473,7 @@ export class ActiveMatch {
                 placeholder="+0"
                 step="1"
                 style="max-width: 90px; text-align:center"
-                aria-label="${this.escHtml(p.displayName)} score to add"
+                aria-label="${escHtml(p.displayName)} score to add"
               />
             </div>
           `;
@@ -508,7 +523,7 @@ export class ActiveMatch {
       inputSectionHtml = `
         <div class="card mt-4" style="text-align:center; padding:2rem 1rem;">
           <div style="font-size:3rem; margin-bottom:0.5rem">🏆</div>
-          <div class="font-bold" style="font-size:1.25rem">${winner ? this.escHtml(winner.player.displayName) : 'Draw'} wins!</div>
+          <div class="font-bold" style="font-size:1.25rem">${winner ? escHtml(winner.player.displayName) : 'Draw'} wins!</div>
           <div class="text-muted text-sm mt-4">Final score: ${winner?.total ?? 0}</div>
           ${nextOrFinishBtn}
           <button class="btn btn-secondary btn-full mt-4" id="back-to-night-btn">Back to Dashboard</button>
@@ -516,19 +531,24 @@ export class ActiveMatch {
       `;
     }
 
-    // Match progress indicator
+    // Match switcher
     const progressHtml = this.nightMatches.length > 1
-      ? `<div class="flex gap-2 items-center justify-center mb-3">
-          ${this.nightMatches.map((m) => {
+      ? `<div class="match-switcher" role="navigation" aria-label="Switch match">
+          ${this.nightMatches.map((m, idx) => {
             const isActive = m.id === this.matchId;
             const isDone = m.status === 'completed';
-            return `<div style="width:8px; height:8px; border-radius:50%; background:${isActive ? 'var(--primary)' : isDone ? 'var(--success)' : 'var(--border)'}"></div>`;
+            const gameName = this.nightMatchGames.get(m.gameId)?.name ?? `Match ${idx + 1}`;
+            const stateClass = isActive ? 'match-pill--active' : isDone ? 'match-pill--done' : 'match-pill--idle';
+            const label = isDone ? `✓ ${gameName}` : gameName;
+            return `<button class="match-pill ${stateClass}" data-match-id="${m.id}"
+              aria-label="Go to ${escHtml(gameName)}" aria-current="${isActive}"
+              ${isActive ? 'disabled' : ''}>${escHtml(label)}</button>`;
           }).join('')}
         </div>`
       : '';
 
     return `
-      <main class="view match-view" aria-label="Active Match: ${this.escHtml(this.game.name)}">
+      <main class="view match-view" aria-label="Active Match: ${escHtml(this.game.name)}">
         <header style="display:flex; align-items:center; gap:0.75rem; padding-top:1rem; margin-bottom:0.5rem;">
           <button class="btn btn-icon btn-sm" id="back-btn" aria-label="Go back">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -536,8 +556,8 @@ export class ActiveMatch {
             </svg>
           </button>
           <div class="match-header flex-1">
-            <div class="match-game-name">${this.escHtml(this.game.name)}</div>
-            <div class="match-night-name">${this.escHtml(this.night.title)}</div>
+            <div class="match-game-name">${escHtml(this.game.name)}</div>
+            <div class="match-night-name">${escHtml(this.night.title)}</div>
           </div>
           ${isCompleted ? '<span class="badge badge-success">Done</span>' : '<span class="badge badge-primary">Live</span>'}
           <button class="btn btn-icon btn-sm" id="round-display-btn" aria-label="Show current round" title="Round Display">
@@ -571,8 +591,9 @@ export class ActiveMatch {
               const dealer = dealerId !== null ? this.players.find(p => p.id === dealerId) : null;
               return `<div class="current-round-banner" aria-label="Current round">
                 <span class="round-banner-label">Now scoring</span>
-                ${this.escHtml(this.roundLabel(this.currentRound))}
-                ${dealer ? `<span class="dealer-pill">🃏 ${this.escHtml(dealer.displayName)}</span>` : ''}
+                ${escHtml(this.roundLabel(this.currentRound))}
+                ${dealer ? `<span class="dealer-pill">🃏 ${escHtml(dealer.displayName)}</span>` : ''}
+                <span class="round-timer" id="round-timer-display" aria-label="Round elapsed time">⏱ ${formatDuration(Date.now() - this._roundStartMs)}</span>
               </div>`;
             })() : ''}
 
@@ -592,6 +613,14 @@ export class ActiveMatch {
   }
 
   afterRender(): void {
+    // Live round timer — tick every second while the match is active
+    const timerEl = document.getElementById('round-timer-display');
+    if (timerEl) {
+      this._timerInterval = setInterval(() => {
+        timerEl.textContent = `⏱ ${formatDuration(Date.now() - this._roundStartMs)}`;
+      }, 1000);
+    }
+
     document.getElementById('toggle-cards')?.addEventListener('click', () => {
       this.tableView = false;
       this.reRender();
@@ -599,6 +628,13 @@ export class ActiveMatch {
     document.getElementById('toggle-table')?.addEventListener('click', () => {
       this.tableView = true;
       this.reRender();
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.match-pill[data-match-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset['matchId'];
+        if (id) navigate('match', { id });
+      });
     });
 
     document.getElementById('back-to-dashboard')?.addEventListener('click', () => navigate('dashboard'));
@@ -703,12 +739,10 @@ export class ActiveMatch {
           return;
         }
         positions.add(pos);
-        // Score inversely by position: 1st = N points, last = 1 point
         const score = this.players.length - pos + 1;
         entries.push({ playerId: player.id!, value: score });
       }
     } else {
-      // rounds / high / low / custom — with optional "who went out first"
       const firstOutId = (document.getElementById('first-out-select') as HTMLSelectElement)?.value ?? '';
       for (const player of this.players) {
         const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
@@ -785,8 +819,6 @@ export class ActiveMatch {
       return;
     }
 
-    // For phase10: winner is the player who completed all phases (highest phase, fewest penalty pts)
-    // computeScores() already sorts correctly for phase10, so playerScores[0] is the winner
     const winner = this.playerScores[0];
     const winnerId = winner?.player.id;
 
@@ -815,7 +847,7 @@ export class ActiveMatch {
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
         <div class="modal-message">
           <div id="edit-modal-title" style="font-weight:600; margin-bottom:0.75rem">
-            ${this.escHtml(playerName)} — ${this.escHtml(roundLbl)}
+            ${escHtml(playerName)} — ${escHtml(roundLbl)}
           </div>
           <input class="form-input" type="number" id="edit-score-input"
             value="${currentValue}" step="1"
@@ -860,7 +892,12 @@ export class ActiveMatch {
     });
   }
 
+  teardown(): void {
+    if (this._timerInterval) { clearInterval(this._timerInterval); this._timerInterval = null; }
+  }
+
   private reRender(): void {
+    this.teardown();
     const container = document.getElementById('view-container');
     if (!container) return;
     container.innerHTML = this.render();

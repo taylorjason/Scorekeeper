@@ -3,6 +3,8 @@ import {
   getGames, createGame, updateGame, deleteGame,
   exportAll, importAll, db
 } from '../db';
+import { importExternalGame } from '../import-game';
+import type { ExternalGameData } from '../import-game';
 import { getSyncConfig, saveSyncConfig, testConnection, syncToGitHub, syncFromGitHub, validateSyncConfig } from '../github';
 import {
   getRoomConfig, saveRoomConfig, clearRoomConfig, generateRoomId,
@@ -10,20 +12,14 @@ import {
   isFirebaseSyncActive, pushNow, pullNow,
 } from '../firebase-sync';
 import { showToast } from '../toast';
+import { escHtml } from '../utils';
+import { PLAYER_COLORS } from '../constants';
 import type { Player, Game, SyncConfig, FirebaseRoomConfig } from '../types';
 
 const PLAYER_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
   '#10b981', '#14b8a6', '#3b82f6', '#6366f1',
   '#8b5cf6', '#ec4899', '#64748b', '#d97706',
-];
-
-const STAT_EMOJIS = [
-  '⚡','🎯','🏆','🥇','🎲','🃏','🌟','🔥','❄️','🚀',
-  '💣','👑','💎','🏅','🎉','⭐','💫','✨','💥','🎁',
-  '⏱️','⚔️','🛡️','💰','🔑','💪','👀','😎','🤩','👍',
-  '👎','👋','🦁','🐉','🌈','☀️','🌙','🎭','🏹','🥊',
-  '🎮','🕹️','🧠','🤔','🦊','🐺','🎪','🔮','🪄','🎰',
 ];
 
 export class Settings {
@@ -44,10 +40,6 @@ export class Settings {
     this.games = games;
     this.syncConfig = getSyncConfig();
     this.roomConfig = getRoomConfig();
-  }
-
-  private escHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   private formatTimestamp(ts: number | undefined): string {
@@ -136,7 +128,7 @@ export class Settings {
                 <label class="form-label" for="sync-baseurl">Gitea Base URL</label>
                 <input class="form-input" type="url" id="sync-baseurl"
                   placeholder="https://gitea.example.com" autocomplete="off"
-                  value="${this.syncConfig?.baseUrl ? this.escHtml(this.syncConfig.baseUrl) : ''}" />
+                  value="${this.syncConfig?.baseUrl ? escHtml(this.syncConfig.baseUrl) : ''}" />
                 <span class="form-hint">Your Gitea instance URL, no trailing slash</span>
               </div>
 
@@ -145,13 +137,13 @@ export class Settings {
                   <label class="form-label" for="sync-username">Username</label>
                   <input class="form-input" type="text" id="sync-username"
                     placeholder="octocat" autocomplete="off"
-                    value="${this.syncConfig ? this.escHtml(this.syncConfig.username) : ''}" />
+                    value="${this.syncConfig ? escHtml(this.syncConfig.username) : ''}" />
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="sync-repo">Repository</label>
                   <input class="form-input" type="text" id="sync-repo"
                     placeholder="my-scores" autocomplete="off"
-                    value="${this.syncConfig ? this.escHtml(this.syncConfig.repo) : ''}" />
+                    value="${this.syncConfig ? escHtml(this.syncConfig.repo) : ''}" />
                 </div>
               </div>
 
@@ -162,7 +154,7 @@ export class Settings {
                 <input class="form-input" type="password" id="sync-pat"
                   placeholder="${this.syncConfig?.provider === 'gitea' ? 'your-api-key' : 'ghp_xxxxxxxxxxxxxxxxxxxx'}"
                   autocomplete="off"
-                  value="${this.syncConfig ? this.escHtml(this.syncConfig.pat) : ''}" />
+                  value="${this.syncConfig ? escHtml(this.syncConfig.pat) : ''}" />
                 <span class="form-hint" id="sync-pat-hint">
                   ${this.syncConfig?.provider === 'gitea'
                     ? 'Settings → Applications → Generate Token (needs repository read/write)'
@@ -175,13 +167,13 @@ export class Settings {
                   <label class="form-label" for="sync-filepath">File Path</label>
                   <input class="form-input" type="text" id="sync-filepath"
                     placeholder="scorekeeper.json"
-                    value="${this.syncConfig ? this.escHtml(this.syncConfig.filePath) : 'scorekeeper.json'}" />
+                    value="${this.syncConfig ? escHtml(this.syncConfig.filePath) : 'scorekeeper.json'}" />
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="sync-branch">Branch</label>
                   <input class="form-input" type="text" id="sync-branch"
                     placeholder="main"
-                    value="${this.syncConfig ? this.escHtml(this.syncConfig.branch) : 'main'}" />
+                    value="${this.syncConfig ? escHtml(this.syncConfig.branch) : 'main'}" />
                 </div>
               </div>
 
@@ -211,6 +203,10 @@ export class Settings {
                 📥 Import Data (JSON)
               </button>
               <input type="file" id="import-file-input" accept=".json" style="display:none" aria-label="Import JSON file" />
+              <button class="btn btn-secondary btn-full" id="import-external-btn">
+                📥 Import External Game
+              </button>
+              <input type="file" id="import-external-file-input" accept=".json,.txt" style="display:none" aria-label="Import external game file" />
               <div class="divider" style="margin: 0.25rem 0"></div>
               <button class="btn btn-danger btn-full" id="clear-data-btn">
                 🗑️ Clear All Data
@@ -254,7 +250,7 @@ export class Settings {
           <div class="toggle-row mb-3">
             <div>
               <div class="font-semibold">Room ID</div>
-              <div class="text-sm text-muted font-mono">${this.escHtml(cfg.roomId)}</div>
+              <div class="text-sm text-muted font-mono">${escHtml(cfg.roomId)}</div>
             </div>
             <span class="badge badge-success">Connected</span>
           </div>
@@ -267,7 +263,7 @@ export class Settings {
             <label class="form-label">Share with friends</label>
             <div class="input-group">
               <input class="form-input" type="text" id="fb-share-url"
-                readonly value="${this.escHtml(shareUrl)}" aria-label="Shareable room link" />
+                readonly value="${escHtml(shareUrl)}" aria-label="Shareable room link" />
               <button class="btn btn-secondary" id="fb-copy-url-btn" type="button">Copy</button>
             </div>
             <span class="form-hint">Anyone who opens this link joins your room automatically.</span>
@@ -304,7 +300,7 @@ export class Settings {
             <label class="form-label" for="fb-room-id">Room ID</label>
             <div class="input-group">
               <input class="form-input font-mono" type="text" id="fb-room-id"
-                value="${this.escHtml(pendingRoomId)}" autocomplete="off"
+                value="${escHtml(pendingRoomId)}" autocomplete="off"
                 placeholder="Enter a room ID or generate one" />
               <button class="btn btn-secondary" type="button" id="fb-new-room-btn">New</button>
             </div>
@@ -328,14 +324,14 @@ export class Settings {
           ${p.displayName.charAt(0).toUpperCase()}
         </div>
         <div class="flex-1">
-          <div class="font-semibold text-sm">${this.escHtml(p.displayName)}</div>
+          <div class="font-semibold text-sm">${escHtml(p.displayName)}</div>
           <div class="text-xs text-muted">${p.active ? 'Active' : 'Inactive'}</div>
         </div>
         <div class="actions">
-          <button class="btn btn-icon btn-sm edit-player-btn" data-player-id="${p.id}" aria-label="Edit ${this.escHtml(p.displayName)}">
+          <button class="btn btn-icon btn-sm edit-player-btn" data-player-id="${p.id}" aria-label="Edit ${escHtml(p.displayName)}">
             ✏️
           </button>
-          <button class="btn btn-icon btn-sm delete-player-btn" data-player-id="${p.id}" aria-label="Delete ${this.escHtml(p.displayName)}">
+          <button class="btn btn-icon btn-sm delete-player-btn" data-player-id="${p.id}" aria-label="Delete ${escHtml(p.displayName)}">
             🗑️
           </button>
         </div>
@@ -360,7 +356,7 @@ export class Settings {
         <div class="form-group">
           <label class="form-label" for="player-name">Name <span aria-hidden="true">*</span></label>
           <input class="form-input" type="text" id="player-name" placeholder="e.g. Alice"
-            value="${this.escHtml(name)}" required maxlength="30" autocomplete="off" />
+            value="${escHtml(name)}" required maxlength="30" autocomplete="off" />
           <span class="form-error" id="player-name-error" role="alert" aria-live="polite"></span>
         </div>
         <div class="form-group">
@@ -394,14 +390,14 @@ export class Settings {
       <div class="game-list-item" data-game-id="${g.id}">
         <span style="font-size:1.25rem">🎯</span>
         <div class="flex-1">
-          <div class="font-semibold text-sm">${this.escHtml(g.name)}</div>
-          <div class="text-xs text-muted">${g.scoringMode} scoring${g.roundLabels?.length ? ` · ${g.roundLabels.length} round labels` : ''}${g.rules ? ' · ' + this.escHtml(g.rules.substring(0, 40)) : ''}</div>
+          <div class="font-semibold text-sm">${escHtml(g.name)}</div>
+          <div class="text-xs text-muted">${g.scoringMode} scoring${g.roundLabels?.length ? ` · ${g.roundLabels.length} round labels` : ''}${g.rules ? ' · ' + escHtml(g.rules.substring(0, 40)) : ''}</div>
         </div>
         <div class="actions">
-          <button class="btn btn-icon btn-sm edit-game-btn" data-game-id="${g.id}" aria-label="Edit ${this.escHtml(g.name)}">
+          <button class="btn btn-icon btn-sm edit-game-btn" data-game-id="${g.id}" aria-label="Edit ${escHtml(g.name)}">
             ✏️
           </button>
-          <button class="btn btn-icon btn-sm delete-game-btn" data-game-id="${g.id}" aria-label="Delete ${this.escHtml(g.name)}">
+          <button class="btn btn-icon btn-sm delete-game-btn" data-game-id="${g.id}" aria-label="Delete ${escHtml(g.name)}">
             🗑️
           </button>
         </div>
@@ -422,7 +418,7 @@ export class Settings {
         <div class="form-group">
           <label class="form-label" for="game-name">Game Name <span aria-hidden="true">*</span></label>
           <input class="form-input" type="text" id="game-name" placeholder="e.g. Five Crowns"
-            value="${this.escHtml(name)}" required maxlength="50" autocomplete="off" />
+            value="${escHtml(name)}" required maxlength="50" autocomplete="off" />
           <span class="form-error" id="game-name-error" role="alert" aria-live="polite"></span>
         </div>
         <div class="form-group">
@@ -440,13 +436,13 @@ export class Settings {
           <label class="form-label" for="game-round-labels">Round Labels (optional)</label>
           <textarea class="form-textarea" id="game-round-labels"
             placeholder="One label per line, e.g.&#10;Phase 1&#10;Phase 2&#10;Phase 3"
-            rows="4">${this.escHtml(labels)}</textarea>
+            rows="4">${escHtml(labels)}</textarea>
           <span class="form-hint">Names each round — great for Phase 10, Five Crowns, etc. Leave blank to use "Round 1, Round 2…"</span>
         </div>
         <div class="form-group">
           <label class="form-label" for="game-rules">Rules / Notes (optional)</label>
           <textarea class="form-textarea" id="game-rules" placeholder="Any rule notes..."
-            maxlength="200" rows="2">${this.escHtml(rules)}</textarea>
+            maxlength="200" rows="2">${escHtml(rules)}</textarea>
         </div>
         <div class="form-group">
           <label class="form-label" for="game-target">Target Score (optional)</label>
@@ -1129,6 +1125,39 @@ export class Settings {
       } catch (err) {
         console.error(err);
         showToast('Import failed — invalid JSON', 'error');
+      }
+    });
+
+    document.getElementById('import-external-btn')?.addEventListener('click', () => {
+      document.getElementById('import-external-file-input')?.click();
+    });
+
+    document.getElementById('import-external-file-input')?.addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text) as ExternalGameData;
+        const summary = await importExternalGame(data);
+
+        const newMsg = summary.newPlayers.length > 0
+          ? ` (${summary.newPlayers.length} new player${summary.newPlayers.length > 1 ? 's' : ''}: ${summary.newPlayers.join(', ')})`
+          : '';
+        showToast(`Imported ${summary.gameName} on ${summary.date}: ${summary.playerCount} players, ${summary.roundCount} rounds${newMsg}`, 'success');
+
+        await this.load();
+        const playersEl = document.getElementById('players-list');
+        if (playersEl) playersEl.innerHTML = this.renderPlayersList();
+        const gamesEl = document.getElementById('games-list');
+        if (gamesEl) gamesEl.innerHTML = this.renderGamesList();
+        this.bindPlayerForm();
+        this.bindGameForm();
+      } catch (err) {
+        console.error(err);
+        showToast('Import failed — check the file format', 'error');
+      } finally {
+        (e.target as HTMLInputElement).value = '';
       }
     });
 

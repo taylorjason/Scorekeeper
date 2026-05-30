@@ -166,21 +166,16 @@ export class History {
           <div class="filter-bar" role="group" aria-label="Player filter">${playerFilterBtns}</div>
 
           <div class="history-filter-row">
-            <div class="history-filter-group">
+            <div class="history-filter-group" style="flex:0 0 auto;min-width:130px;max-width:180px">
               <div class="section-title mb-1">Game</div>
-              <select id="game-filter-select" class="form-input" style="min-width:0">
+              <select id="game-filter-select" class="form-input" style="min-width:0;width:100%">
                 <option value="">All Games</option>
                 ${gameOptions}
               </select>
             </div>
 
-            <div class="history-filter-group" style="flex:2">
-              <div class="history-date-header">
-                <span class="section-title">Date Range</span>
-                <button class="btn btn-secondary btn-sm" id="sort-toggle" style="padding:2px 10px;font-size:0.75rem">
-                  ${this.sortOrder === 'desc' ? '↓ Newest' : '↑ Oldest'}
-                </button>
-              </div>
+            <div class="history-filter-group" style="flex:1;min-width:0">
+              <div class="section-title mb-1">Date Range</div>
               <div class="filter-bar mb-2" role="group" aria-label="Date presets" style="flex-wrap:nowrap;gap:0.3rem">
                 ${datePresets.map(([val, label]) =>
                   `<button class="tab-btn ${activePreset === val ? 'active' : ''}" data-date-preset="${val}" style="padding:4px 10px;font-size:0.8rem">${label}</button>`
@@ -193,6 +188,12 @@ export class History {
                 <input type="date" id="date-to" class="form-input" value="${this.filterDateTo}"
                   aria-label="To date" style="flex:1;min-width:0;padding:6px 8px;font-size:0.85rem">
               </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;justify-content:flex-end;flex-shrink:0">
+              <button class="btn btn-secondary btn-sm" id="sort-toggle" style="white-space:nowrap">
+                ${this.sortOrder === 'desc' ? '↓ Newest' : '↑ Oldest'}
+              </button>
             </div>
           </div>
         </section>

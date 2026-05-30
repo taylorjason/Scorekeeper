@@ -4,7 +4,7 @@ import {
 } from '../db';
 import { navigate } from '../router';
 import { showToast } from '../toast';
-import { escHtml } from '../utils';
+import { escHtml, computeRoundDurations, formatDuration } from '../utils';
 import type { GameNight, Match, Player, Game, ScoreEntry } from '../types';
 
 interface NightWithMatches {
@@ -289,14 +289,14 @@ export class History {
     const md = this.nights.flatMap(n => n.matches).find(m => m.match.id === matchId);
     if (!md) return;
 
-    const rounds = [...new Set(md.entries.map(e => e.roundNumber))].sort((a, b) => a - b);
+    const isPhase10 = md.game?.scoringMode === 'phase10';
     const labels = md.game?.roundLabels;
+    const rounds = [...new Set(md.entries.map(e => e.roundNumber))].sort((a, b) => a - b);
 
-    const headerCells = rounds.map(r =>
-      `<th>${labels?.[r - 1] ? escHtml(labels[r - 1]) : `R${r}`}</th>`
-    ).join('');
+    const roundLabel = (rn: number): string =>
+      labels && labels.length >= rn ? labels[rn - 1] : `Round ${rn}`;
 
-    const isFirstOut = (note?: string): boolean => {
+    const isFirstOutFn = (note?: string): boolean => {
       if (note === 'first_out') return true;
       if (note) {
         try { return !!(JSON.parse(note) as { firstOut?: boolean }).firstOut; }
@@ -305,22 +305,75 @@ export class History {
       return false;
     };
 
-    const bodyRows = md.playerTotals.map(({ player, total }, i) => {
-      const roundCells = rounds.map(r => {
-        const entry = md.entries.find(e => e.playerId === player.id && e.roundNumber === r);
-        const fo = entry !== undefined && isFirstOut(entry.note);
-        return `<td class="score-table-score">${fo ? '⚡ ' : ''}${entry !== undefined ? entry.value : '—'}</td>`;
-      }).join('');
-      return `
-        <tr class="${i === 0 && md.match.status === 'completed' ? 'score-table-total-row' : ''}">
-          <td class="score-table-label">
-            <span class="player-dot" style="background:${player.color}"></span>
-            ${i === 0 && md.match.status === 'completed' ? '🏆 ' : ''}${escHtml(player.displayName)}
-          </td>
-          ${roundCells}
-          <td class="score-table-label-total">${total}</td>
-        </tr>`;
+    const roundDurations = computeRoundDurations(md.entries, md.match.createdAt);
+
+    // Header: players in match order
+    const headerCells = md.players.map(p =>
+      `<th style="background:${p.color}22; border-bottom:2px solid ${p.color}">
+        <div class="flex items-center gap-1 justify-center">
+          <span class="player-dot" style="background:${p.color}; flex-shrink:0"></span>
+          <span>${escHtml(p.displayName)}</span>
+          ${md.winner?.id === p.id ? ' 🏆' : ''}
+        </div>
+      </th>`
+    ).join('');
+
+    // Totals row
+    const totalCells = md.players.map(p => {
+      const pt = md.playerTotals.find(t => t.player.id === p.id);
+      return `<td class="score-table-footer">${pt?.total ?? 0}</td>`;
     }).join('');
+
+    // Running cumulative totals per round
+    const cumulative = new Map<number, number>(md.players.map(p => [p.id!, 0]));
+    const runningTotals = new Map<number, Map<number, number>>();
+    for (const rn of rounds) {
+      const roundEntries = md.entries.filter(e => e.roundNumber === rn);
+      for (const p of md.players) {
+        const val = roundEntries.find(e => e.playerId === p.id)?.value ?? 0;
+        cumulative.set(p.id!, (cumulative.get(p.id!) ?? 0) + val);
+      }
+      runningTotals.set(rn, new Map(cumulative));
+    }
+
+    // Rounds newest-first
+    let rowsHtml = '';
+    for (const rn of [...rounds].reverse()) {
+      const roundEntries = md.entries.filter(e => e.roundNumber === rn);
+      const dur = roundDurations.get(rn);
+      const durHtml = dur !== undefined ? ` <span class="score-table-dur">${formatDuration(dur)}</span>` : '';
+
+      const scoreCells = md.players.map(p => {
+        const entry = roundEntries.find(e => e.playerId === p.id);
+        if (!entry) return `<td class="score-table-score">–</td>`;
+        if (isPhase10) {
+          try {
+            const data = JSON.parse(entry.note ?? '{}') as { phase?: number; completed?: boolean; firstOut?: boolean };
+            const phaseLabel = data.phase ? `Ph.${data.phase}` : '';
+            const completedMark = data.completed ? ' ✓' : '';
+            const foMark = data.firstOut ? ' ⚡' : '';
+            return `<td class="score-table-score">${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
+          } catch { /* fall through */ }
+        }
+        const fo = isFirstOutFn(entry.note);
+        return `<td class="score-table-score">${fo ? '⚡ ' : ''}${entry.value}</td>`;
+      }).join('');
+
+      const runCells = md.players.map(p => {
+        const cum = runningTotals.get(rn)?.get(p.id!) ?? 0;
+        return `<td class="score-table-total">= ${cum}</td>`;
+      }).join('');
+
+      rowsHtml += `
+        <tr class="score-table-round-row">
+          <td class="score-table-label">${escHtml(roundLabel(rn))}${durHtml}</td>
+          ${scoreCells}
+        </tr>
+        <tr class="score-table-total-row">
+          <td class="score-table-label-total">∑</td>
+          ${runCells}
+        </tr>`;
+    }
 
     const modal = document.createElement('div');
     modal.id = 'score-table-modal';
@@ -334,16 +387,19 @@ export class History {
           <h2 class="modal-title">${md.game ? escHtml(md.game.name) : 'Score Table'}</h2>
           <button class="icon-btn modal-close-btn" aria-label="Close">✕</button>
         </div>
-        <div class="score-table-wrapper" style="overflow-x:auto;overflow-y:auto">
-          <table class="score-table">
+        <div class="score-table-wrapper" style="overflow:auto;flex:1">
+          <table class="score-table" aria-label="Scores by round">
             <thead>
               <tr>
-                <th class="score-table-corner">Player</th>
+                <th class="score-table-corner">Round</th>
                 ${headerCells}
-                <th>Total</th>
+              </tr>
+              <tr class="score-table-totals-row">
+                <td class="score-table-label-total">Total</td>
+                ${totalCells}
               </tr>
             </thead>
-            <tbody>${bodyRows}</tbody>
+            <tbody>${rowsHtml}</tbody>
           </table>
         </div>
       </div>

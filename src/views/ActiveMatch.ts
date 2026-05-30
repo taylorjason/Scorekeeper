@@ -335,7 +335,7 @@ export class ActiveMatch {
           const isDone = phase > 10;
           if (isDone) {
             return `
-              <div class="phase10-player-row" style="opacity:0.6">
+              <div class="phase10-player-row" data-player-id="${p.id}" style="opacity:0.6">
                 <div class="flex items-center gap-2">
                   <span class="player-dot" style="background:${p.color}"></span>
                   <span class="font-semibold">${escHtml(p.displayName)}</span>
@@ -345,7 +345,7 @@ export class ActiveMatch {
             `;
           }
           return `
-            <div class="phase10-player-row">
+            <div class="phase10-player-row" data-player-id="${p.id}">
               <div class="flex items-center gap-2 mb-1">
                 <span class="player-dot" style="background:${p.color}"></span>
                 <span class="font-semibold">${escHtml(p.displayName)}</span>
@@ -373,7 +373,7 @@ export class ActiveMatch {
               <div class="card-title">Round ${this.currentRound}</div>
               <span class="round-badge">Phase 10</span>
             </div>
-            ${playerRows}
+            <div id="player-rows-container">${playerRows}</div>
             ${firstOutSelector}
             <div class="btn-group mt-3">
               <button class="btn btn-primary flex-1" id="add-round-btn" aria-label="Save round">
@@ -388,7 +388,7 @@ export class ActiveMatch {
       } else if (mode === 'rounds') {
         // Grid inputs - one per player
         const inputs = this.players.map(p => `
-          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;" data-player-id="${p.id}">
             <div class="flex items-center gap-1">
               <span class="player-dot" style="background:${p.color}"></span>
               <span class="text-xs font-semibold">${escHtml(p.displayName)}</span>
@@ -412,7 +412,7 @@ export class ActiveMatch {
               <div class="card-title">${this.roundLabel(this.currentRound)}</div>
               <span class="round-badge">🎯 ${this.roundLabel(this.currentRound)}</span>
             </div>
-            <div style="display:flex; flex-wrap:wrap; gap:0.75rem; justify-content:center; margin-bottom:0.5rem;">
+            <div id="player-rows-container" style="display:flex; flex-wrap:wrap; gap:0.75rem; justify-content:center; margin-bottom:0.5rem;">
               ${inputs}
             </div>
             ${firstOutSelector}
@@ -461,7 +461,7 @@ export class ActiveMatch {
         const runningInputs = this.players.map(p => {
           const current = this.playerScores.find(ps => ps.player.id === p.id)?.total ?? 0;
           return `
-            <div class="flex items-center gap-3 mb-2">
+            <div class="flex items-center gap-3 mb-2" data-player-id="${p.id}">
               <span class="player-dot player-dot-lg" style="background:${p.color}"></span>
               <span class="font-semibold flex-1">${escHtml(p.displayName)}</span>
               <span class="text-sm text-muted" style="min-width:40px; text-align:right">=${current}</span>
@@ -486,7 +486,7 @@ export class ActiveMatch {
               <div class="card-title">${addLabel}</div>
               <span class="round-badge">${this.roundLabel(this.currentRound)}</span>
             </div>
-            <div style="margin-bottom:0.5rem">
+            <div id="player-rows-container" style="margin-bottom:0.5rem">
               ${runningInputs}
             </div>
             ${firstOutSelector}
@@ -700,6 +700,36 @@ export class ActiveMatch {
           else document.getElementById('add-round-btn')?.click();
         }
       });
+    });
+
+    // First-out select: reorder player rows, set score to 0, focus next
+    document.getElementById('first-out-select')?.addEventListener('change', (e) => {
+      const selectedId = (e.target as HTMLSelectElement).value;
+      const container = document.getElementById('player-rows-container');
+      if (!container) return;
+
+      if (!selectedId) {
+        const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'));
+        const rowMap = new Map(rows.map(r => [r.dataset['playerId']!, r]));
+        this.players.forEach(p => {
+          const row = rowMap.get(String(p.id));
+          if (row) container.appendChild(row);
+        });
+        return;
+      }
+
+      const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'));
+      const firstOutRow = rows.find(r => r.dataset['playerId'] === selectedId);
+      if (!firstOutRow) return;
+      container.insertBefore(firstOutRow, container.firstChild);
+
+      const input = document.getElementById(`score-input-${selectedId}`) as HTMLInputElement | null;
+      if (input) input.value = '0';
+
+      const remaining = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'))
+        .filter(r => r.dataset['playerId'] !== selectedId);
+      const nextId = remaining[0]?.dataset['playerId'];
+      if (nextId) (document.getElementById(`score-input-${nextId}`) as HTMLInputElement | null)?.focus();
     });
   }
 

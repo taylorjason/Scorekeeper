@@ -1,22 +1,30 @@
 import { db } from '../db';
 import { computePlayerStats, computeLeaderboard, computeGameStats } from '../stats';
 import { escHtml, formatDuration } from '../utils';
-import { buildFactTable, runQuery, dateFromPreset, fieldLabel } from '../query-engine';
-import type { StatRow, StatQuery, StatResult, FieldKey, GroupKey, MetricFn } from '../query-engine';
+import {
+  buildFactTable, runQuery, dateFromPreset, fieldLabel,
+  loadFieldConfig, getActiveFields, newConditionId,
+  OPERATOR_LABELS,
+} from '../query-engine';
+import type {
+  StatRow, StatQuery, StatResult, FieldKey, GroupKey, MetricFn,
+  ActiveCondition, CompiledField, FieldConfig,
+} from '../query-engine';
 import type { Chart as ChartType } from 'chart.js';
 import type { Player, Game } from '../types';
 
 const QUICK_INSIGHTS: Array<{ id: string; label: string; query: StatQuery }> = [
   { id: 'first-out', label: '⚡ First-Out Leaders',
-    query: { metric: 'count', field: 'isFirstOut', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'player' } },
+    query: { metric: 'count', field: 'isFirstOut', groupBy: 'player', conditions: [] } },
   { id: 'fastest',   label: '⏱ Fastest Rounds',
-    query: { metric: 'min', field: 'roundDuration', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'game' } },
+    query: { metric: 'min', field: 'roundDuration', groupBy: 'game', conditions: [] } },
   { id: 'avg-score', label: '📊 Avg Round Score',
-    query: { metric: 'avg', field: 'value', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'player' } },
+    query: { metric: 'avg', field: 'value', groupBy: 'player', conditions: [] } },
   { id: 'wins',      label: '🏆 Win Leaders',
-    query: { metric: 'count', field: 'isWin', filters: { playerIds: [], gameIds: [], dateFrom: '' }, groupBy: 'player' } },
+    query: { metric: 'count', field: 'isWin', groupBy: 'player', conditions: [] } },
   { id: 'monthly',   label: '📅 Last 3 Months',
-    query: { metric: 'count', field: 'isWin', filters: { playerIds: [], gameIds: [], dateFrom: dateFromPreset('3mo') }, groupBy: 'month' } },
+    query: { metric: 'count', field: 'isWin', groupBy: 'month',
+      conditions: [{ id: 'qi-date', fieldKey: 'nightDate', operator: 'gte', value: dateFromPreset('3mo') }] } },
 ];
 
 export class Stats {
@@ -28,8 +36,10 @@ export class Stats {
 
   private activeMainTab: 'overview' | 'explorer' = 'overview';
   private factTable: StatRow[] = [];
-  private currentQuery: StatQuery = QUICK_INSIGHTS[0].query;
+  private currentQuery: StatQuery = { ...QUICK_INSIGHTS[0].query, conditions: [] };
   private queryResults: StatResult[] | null = null;
+  private fieldConfig: FieldConfig = loadFieldConfig();
+  private activeFieldDefs: CompiledField[] = [];
 
   private _winsChart: ChartType | null = null;
   private _trendChart: ChartType | null = null;
@@ -46,6 +56,8 @@ export class Stats {
     this.games = games;
     this.leaderboard = lb;
     this.factTable = factTable;
+    this.fieldConfig = loadFieldConfig();
+    this.activeFieldDefs = getActiveFields(this.fieldConfig);
 
     if (this.selectedPlayerId === null && this.players.length > 0) {
       this.selectedPlayerId = this.players[0].id!;
@@ -248,36 +260,16 @@ export class Stats {
       `<button class="quick-insight-btn" data-insight="${ins.id}">${ins.label}</button>`
     ).join('');
 
-    const playerOptions = `<option value="">All Players</option>` +
-      this.players.map(p =>
-        `<option value="${p.id}" ${q.filters.playerIds[0] === p.id ? 'selected' : ''}>${escHtml(p.displayName)}</option>`
-      ).join('');
+    const conditionsHtml = q.conditions.map(c => this._renderConditionRow(c)).join('');
 
-    const gameOptions = `<option value="">All Games</option>` +
-      this.games.map(g =>
-        `<option value="${g.id}" ${q.filters.gameIds[0] === g.id ? 'selected' : ''}>${escHtml(g.name)}</option>`
-      ).join('');
-
-    const DATE_PRESETS = [
-      { value: '',    label: 'All time' },
-      { value: '30d', label: 'Last 30 days' },
-      { value: '3mo', label: 'Last 3 months' },
-      { value: '6mo', label: 'Last 6 months' },
-      { value: '1yr', label: 'This year' },
-    ];
-    const activeDatePreset = DATE_PRESETS.find(p => p.value !== '' && dateFromPreset(p.value) === q.filters.dateFrom)?.value ?? '';
-    const dateOptions = DATE_PRESETS.map(p =>
-      `<option value="${p.value}" ${activeDatePreset === p.value ? 'selected' : ''}>${p.label}</option>`
-    ).join('');
-
-    const fieldOptions = [
+    const fieldOpts = [
       { value: 'value',         label: 'Round Score' },
       { value: 'roundDuration', label: 'Round Duration' },
       { value: 'isFirstOut',    label: 'First-Out Events' },
       { value: 'isWin',         label: 'Wins' },
     ].map(o => `<option value="${o.value}" ${q.field === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
 
-    const metricOptions = [
+    const metricOpts = [
       { value: 'count', label: 'Count' },
       { value: 'avg',   label: 'Average' },
       { value: 'sum',   label: 'Total' },
@@ -285,12 +277,15 @@ export class Stats {
       { value: 'max',   label: 'Maximum' },
     ].map(o => `<option value="${o.value}" ${q.metric === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
 
-    const groupOptions = [
-      { value: 'none',   label: 'None (single value)' },
-      { value: 'player', label: 'By Player' },
-      { value: 'game',   label: 'By Game' },
-      { value: 'month',  label: 'By Month' },
+    const groupOpts = [
+      { value: 'none',      label: 'None (single value)' },
+      { value: 'player',    label: 'By Player' },
+      { value: 'game',      label: 'By Game' },
+      { value: 'month',     label: 'By Month' },
+      { value: 'dayOfWeek', label: 'By Day of Week' },
     ].map(o => `<option value="${o.value}" ${q.groupBy === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+
+    const noFields = this.activeFieldDefs.length === 0;
 
     return `
       <div class="explorer-wrap">
@@ -301,38 +296,112 @@ export class Stats {
           </div>
         </section>
 
-        <section class="query-builder card mb-4" aria-label="Custom query builder">
+        <section class="query-builder card mb-4" aria-label="Query builder">
           <div class="card-header">
-            <h2 class="card-title">Custom Query</h2>
+            <h2 class="card-title">Build a Query</h2>
           </div>
+
+          <div class="qb-section-label">Filters</div>
+          <div id="conditions-list">
+            ${conditionsHtml}
+          </div>
+          <button class="btn btn-secondary btn-sm mt-2" id="add-condition-btn" ${noFields ? 'disabled' : ''}>
+            + Add Condition
+          </button>
+          ${noFields ? `<p class="text-sm text-muted mt-1">Enable filter fields in Settings → Stats Fields.</p>` : ''}
+
+          <div class="qb-divider"></div>
+
+          <div class="qb-section-label">Measure</div>
           <div class="qb-row">
-            <label class="qb-label" for="qb-metric">Show me</label>
-            <select class="form-select qb-select" id="qb-metric">${metricOptions}</select>
+            <select class="form-select qb-select" id="qb-metric">${metricOpts}</select>
             <span class="qb-of">of</span>
-            <select class="form-select qb-select" id="qb-field">${fieldOptions}</select>
+            <select class="form-select qb-select" id="qb-field">${fieldOpts}</select>
           </div>
+
+          <div class="qb-section-label" style="margin-top:0.75rem">Group by</div>
           <div class="qb-row">
-            <label class="qb-label" for="qb-player">Player</label>
-            <select class="form-select qb-select" id="qb-player">${playerOptions}</select>
+            <select class="form-select qb-select" id="qb-groupby" style="max-width:220px">${groupOpts}</select>
           </div>
-          <div class="qb-row">
-            <label class="qb-label" for="qb-game">Game</label>
-            <select class="form-select qb-select" id="qb-game">${gameOptions}</select>
-          </div>
-          <div class="qb-row">
-            <label class="qb-label" for="qb-date">Date</label>
-            <select class="form-select qb-select" id="qb-date">${dateOptions}</select>
-          </div>
-          <div class="qb-row">
-            <label class="qb-label" for="qb-groupby">Group by</label>
-            <select class="form-select qb-select" id="qb-groupby">${groupOptions}</select>
-          </div>
+
           <button class="btn btn-primary mt-3 btn-full" id="qb-run-btn">▶ Run Query</button>
         </section>
 
         <div id="explorer-results">${this._renderQueryResults()}</div>
       </div>
     `;
+  }
+
+  private _renderConditionRow(cond: ActiveCondition): string {
+    const fields = this.activeFieldDefs;
+    const def = fields.find(f => f.key === cond.fieldKey) ?? fields[0];
+    if (!def) return '';
+
+    const fieldSel = `<select class="cond-field form-select" data-cid="${cond.id}" aria-label="Filter field">
+      ${fields.map(f => `<option value="${escHtml(f.key)}" ${f.key === cond.fieldKey ? 'selected' : ''}>${escHtml(f.label)}</option>`).join('')}
+    </select>`;
+
+    const opSel = `<select class="cond-op form-select" data-cid="${cond.id}" aria-label="Operator">
+      ${def.operators.map(op => `<option value="${op}" ${op === cond.operator ? 'selected' : ''}>${OPERATOR_LABELS[op]}</option>`).join('')}
+    </select>`;
+
+    const valHtml = this._renderValuePicker(cond, def);
+
+    return `<div class="condition-row" data-cid="${cond.id}">
+      ${fieldSel}${opSel}${valHtml}
+      <button class="cond-remove btn btn-icon btn-sm" data-cid="${cond.id}" aria-label="Remove condition" title="Remove">×</button>
+    </div>`;
+  }
+
+  private _renderValuePicker(cond: ActiveCondition, def: CompiledField): string {
+    const val = String(cond.value ?? '');
+    const cid = `data-cid="${cond.id}"`;
+
+    if (def.type === 'boolean') {
+      return `<select class="cond-val form-select" ${cid} aria-label="Value">
+        <option value="true"  ${val === 'true'  ? 'selected' : ''}>Yes</option>
+        <option value="false" ${val === 'false' ? 'selected' : ''}>No</option>
+      </select>`;
+    }
+
+    if (def.type === 'player-set') {
+      return `<select class="cond-val form-select" ${cid} aria-label="Player">
+        ${this.players.map(p =>
+          `<option value="${p.id}" ${val === String(p.id) ? 'selected' : ''}>${escHtml(p.displayName)}</option>`
+        ).join('')}
+      </select>`;
+    }
+
+    if (def.key === 'gameId' || (def.type === 'enum' && !def.options)) {
+      return `<select class="cond-val form-select" ${cid} aria-label="Game">
+        ${this.games.map(g =>
+          `<option value="${g.id}" ${val === String(g.id) ? 'selected' : ''}>${escHtml(g.name)}</option>`
+        ).join('')}
+      </select>`;
+    }
+
+    if (def.key === 'playerId') {
+      return `<select class="cond-val form-select" ${cid} aria-label="Player">
+        ${this.players.map(p =>
+          `<option value="${p.id}" ${val === String(p.id) ? 'selected' : ''}>${escHtml(p.displayName)}</option>`
+        ).join('')}
+      </select>`;
+    }
+
+    if (def.type === 'enum' && def.options) {
+      return `<select class="cond-val form-select" ${cid} aria-label="Value">
+        ${def.options.map(o =>
+          `<option value="${o.value}" ${val === String(o.value) ? 'selected' : ''}>${escHtml(o.label)}</option>`
+        ).join('')}
+      </select>`;
+    }
+
+    if (def.type === 'date') {
+      return `<input type="date" class="cond-val form-input cond-val-date" ${cid} value="${escHtml(val)}" aria-label="Date">`;
+    }
+
+    // number (default)
+    return `<input type="number" class="cond-val form-input cond-val-num" ${cid} value="${escHtml(val)}" aria-label="Value">`;
   }
 
   private _renderQueryResults(): string {
@@ -413,6 +482,7 @@ export class Stats {
         });
       });
     } else {
+      this.activeFieldDefs = getActiveFields(this.fieldConfig);
       this._bindExplorer();
       if (this.queryResults?.length && this.currentQuery.groupBy !== 'none') {
         await this.renderExplorerChart();
@@ -421,39 +491,112 @@ export class Stats {
   }
 
   private _bindExplorer(): void {
+    // Quick insights
     document.querySelectorAll<HTMLButtonElement>('.quick-insight-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const ins = QUICK_INSIGHTS.find(i => i.id === btn.dataset['insight']);
         if (!ins) return;
-        this.currentQuery = { ...ins.query };
-        this.queryResults = runQuery(this.factTable, this.currentQuery);
+        // Deep-clone so quick insights don't share condition arrays
+        this.currentQuery = { ...ins.query, conditions: ins.query.conditions.map(c => ({ ...c })) };
+        this.queryResults = runQuery(this.factTable, this.currentQuery, this.activeFieldDefs);
         this.reRender();
       });
     });
 
+    // Add condition
+    document.getElementById('add-condition-btn')?.addEventListener('click', () => {
+      const first = this.activeFieldDefs[0];
+      if (!first) return;
+      this.currentQuery.conditions.push({
+        id: newConditionId(),
+        fieldKey: first.key,
+        operator: first.operators[0],
+        value: first.type === 'boolean' ? 'true'
+             : first.options ? String(first.options[0]?.value ?? '')
+             : first.type === 'player-set' ? String(this.players[0]?.id ?? '')
+             : '',
+      });
+      this._reRenderExplorer();
+    });
+
+    // Field selector changed → reset operator + value, re-render condition list
+    document.querySelectorAll<HTMLSelectElement>('.cond-field').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const cid = sel.dataset['cid']!;
+        const cond = this.currentQuery.conditions.find(c => c.id === cid);
+        if (!cond) return;
+        const newDef = this.activeFieldDefs.find(f => f.key === sel.value);
+        if (!newDef) return;
+        cond.fieldKey = sel.value;
+        cond.operator = newDef.operators[0];
+        cond.value = newDef.type === 'boolean' ? 'true'
+                   : newDef.options ? String(newDef.options[0]?.value ?? '')
+                   : newDef.type === 'player-set' ? String(this.players[0]?.id ?? '')
+                   : '';
+        this._reRenderExplorer();
+      });
+    });
+
+    // Operator changed → may change value picker shape
+    document.querySelectorAll<HTMLSelectElement>('.cond-op').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const cid = sel.dataset['cid']!;
+        const cond = this.currentQuery.conditions.find(c => c.id === cid);
+        if (!cond) return;
+        cond.operator = sel.value as import('../query-engine').OperatorKey;
+        this._reRenderExplorer();
+      });
+    });
+
+    // Value changed → update state (no re-render)
+    document.querySelectorAll<HTMLElement>('.cond-val').forEach(el => {
+      el.addEventListener('change', () => {
+        const cid = (el as HTMLElement & { dataset: DOMStringMap }).dataset['cid']!;
+        const cond = this.currentQuery.conditions.find(c => c.id === cid);
+        if (!cond) return;
+        cond.value = (el as HTMLInputElement | HTMLSelectElement).value;
+      });
+    });
+
+    // Remove condition
+    document.querySelectorAll<HTMLButtonElement>('.cond-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cid = btn.dataset['cid']!;
+        this.currentQuery.conditions = this.currentQuery.conditions.filter(c => c.id !== cid);
+        this._reRenderExplorer();
+      });
+    });
+
+    // Run
     document.getElementById('qb-run-btn')?.addEventListener('click', () => {
       this._readFormAndRun();
     });
   }
 
   private _readFormAndRun(): void {
-    const metric    = ((document.getElementById('qb-metric')  as HTMLSelectElement)?.value ?? 'count') as MetricFn;
-    const field     = ((document.getElementById('qb-field')   as HTMLSelectElement)?.value ?? 'value') as FieldKey;
-    const groupBy   = ((document.getElementById('qb-groupby') as HTMLSelectElement)?.value ?? 'none') as GroupKey;
-    const playerRaw = (document.getElementById('qb-player') as HTMLSelectElement)?.value ?? '';
-    const gameRaw   = (document.getElementById('qb-game')   as HTMLSelectElement)?.value ?? '';
-    const datePreset = (document.getElementById('qb-date')  as HTMLSelectElement)?.value ?? '';
+    // Flush any pending value inputs
+    document.querySelectorAll<HTMLElement>('.cond-val').forEach(el => {
+      const cid = (el as HTMLElement & { dataset: DOMStringMap }).dataset['cid']!;
+      const cond = this.currentQuery.conditions.find(c => c.id === cid);
+      if (cond) cond.value = (el as HTMLInputElement | HTMLSelectElement).value;
+    });
 
-    this.currentQuery = {
-      metric, field, groupBy,
-      filters: {
-        playerIds: playerRaw ? [parseInt(playerRaw, 10)] : [],
-        gameIds:   gameRaw   ? [parseInt(gameRaw,   10)] : [],
-        dateFrom:  dateFromPreset(datePreset),
-      },
-    };
-    this.queryResults = runQuery(this.factTable, this.currentQuery);
+    this.currentQuery.metric  = ((document.getElementById('qb-metric')  as HTMLSelectElement)?.value ?? 'count') as MetricFn;
+    this.currentQuery.field   = ((document.getElementById('qb-field')   as HTMLSelectElement)?.value ?? 'value') as FieldKey;
+    this.currentQuery.groupBy = ((document.getElementById('qb-groupby') as HTMLSelectElement)?.value ?? 'none') as GroupKey;
+
+    this.queryResults = runQuery(this.factTable, this.currentQuery, this.activeFieldDefs);
     this.reRender();
+  }
+
+  private async _reRenderExplorer(): Promise<void> {
+    const panel = document.getElementById('stats-panel-explorer');
+    if (!panel) return;
+    panel.innerHTML = this._renderExplorerTab();
+    this._bindExplorer();
+    if (this.queryResults?.length && this.currentQuery.groupBy !== 'none') {
+      await this.renderExplorerChart();
+    }
   }
 
   private async renderExplorerChart(): Promise<void> {

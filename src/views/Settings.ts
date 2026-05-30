@@ -15,6 +15,10 @@ import { showToast } from '../toast';
 import { escHtml } from '../utils';
 import { PLAYER_COLORS } from '../constants';
 import type { Player, Game, SyncConfig, FirebaseRoomConfig } from '../types';
+import {
+  loadFieldConfig, saveFieldConfig, BUILTIN_FIELDS,
+} from '../query-engine';
+import type { FieldConfig } from '../query-engine';
 
 export class Settings {
   private players: Player[] = [];
@@ -23,7 +27,8 @@ export class Settings {
   private roomConfig: FirebaseRoomConfig | null = null;
   private editingPlayerId: number | null = null;
   private editingGameId: number | null = null;
-  private activeTab: 'players' | 'games' | 'sync' | 'data' = 'players';
+  private activeTab: 'players' | 'games' | 'sync' | 'data' | 'stats' = 'players';
+  private fieldConfig: FieldConfig = loadFieldConfig();
 
   async load(): Promise<void> {
     const [players, games] = await Promise.all([getPlayers(), getGames()]);
@@ -31,6 +36,7 @@ export class Settings {
     this.games = games;
     this.syncConfig = getSyncConfig();
     this.roomConfig = getRoomConfig();
+    this.fieldConfig = loadFieldConfig();
   }
 
   private formatTimestamp(ts: number | undefined): string {
@@ -55,6 +61,7 @@ export class Settings {
           <button class="stats-main-tab-btn ${t === 'games'   ? 'active' : ''}" data-settings-tab="games"   role="tab">Games</button>
           <button class="stats-main-tab-btn ${t === 'sync'    ? 'active' : ''}" data-settings-tab="sync"    role="tab">Sync</button>
           <button class="stats-main-tab-btn ${t === 'data'    ? 'active' : ''}" data-settings-tab="data"    role="tab">Data</button>
+          <button class="stats-main-tab-btn ${t === 'stats'   ? 'active' : ''}" data-settings-tab="stats"   role="tab">Stats Fields</button>
         </div>
 
         <!-- Players tab -->
@@ -215,8 +222,100 @@ export class Settings {
           </section>
         </div>
 
+        <!-- Stats Fields tab -->
+        <div id="settings-tab-stats" role="tabpanel" ${panel('stats')}>
+          ${this.renderStatsFieldsTab()}
+        </div>
+
         <div style="height:1rem"></div>
       </main>
+    `;
+  }
+
+  private renderStatsFieldsTab(): string {
+    const cfg = this.fieldConfig;
+
+    const builtinRows = cfg.builtinOrder.map((key, idx) => {
+      const def = BUILTIN_FIELDS.find(f => f.key === key);
+      if (!def) return '';
+      const enabled = cfg.builtinEnabled[key] !== false;
+      return `
+        <div class="sf-row" data-field-key="${escHtml(key)}">
+          <label class="toggle sf-toggle" aria-label="Enable ${escHtml(def.label)}">
+            <input type="checkbox" class="sf-builtin-toggle" data-field-key="${escHtml(key)}" ${enabled ? 'checked' : ''} role="switch">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="sf-label ${enabled ? '' : 'text-muted'}">${escHtml(def.label)}</span>
+          <span class="sf-type-pill">${def.type}</span>
+          <div class="sf-reorder">
+            <button class="btn btn-icon btn-sm sf-up" data-field-key="${escHtml(key)}" ${idx === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+            <button class="btn btn-icon btn-sm sf-down" data-field-key="${escHtml(key)}" ${idx === cfg.builtinOrder.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    const customRows = cfg.customFields.map(cf => `
+      <div class="sf-row sf-custom-row">
+        <span class="sf-label">${escHtml(cf.label)}</span>
+        <span class="sf-type-pill">${cf.type}</span>
+        <code class="sf-expr text-muted">${escHtml(cf.expression)}</code>
+        <div class="sf-reorder">
+          <button class="btn btn-sm btn-secondary sf-edit-custom" data-custom-id="${escHtml(cf.id)}" style="font-size:0.75rem;padding:2px 8px">Edit</button>
+          <button class="btn btn-sm btn-danger sf-del-custom" data-custom-id="${escHtml(cf.id)}" style="font-size:0.75rem;padding:2px 8px">✕</button>
+        </div>
+      </div>`).join('');
+
+    return `
+      <section class="settings-section" aria-labelledby="sf-builtin-heading">
+        <h2 class="settings-section-title" id="sf-builtin-heading"><span>🔧</span> Built-in Filter Fields</h2>
+        <p class="text-sm text-muted mb-2">Enable or disable fields that appear in the Stats Explorer condition builder. Use the arrows to reorder.</p>
+        <div class="card sf-list" id="sf-builtin-list">
+          ${builtinRows || '<p class="text-sm text-muted" style="padding:0.5rem">No built-in fields found.</p>'}
+        </div>
+      </section>
+
+      <section class="settings-section" aria-labelledby="sf-custom-heading">
+        <h2 class="settings-section-title" id="sf-custom-heading"><span>✨</span> Custom Fields</h2>
+        <p class="text-sm text-muted mb-2">Write a JavaScript expression using the <code>row</code> variable to create any derived field.
+          E.g. <code>row.playerCount > 3</code> (boolean) or <code>row.matchIndexInNight + 1</code> (number).</p>
+        <div class="card sf-list mb-2" id="sf-custom-list">
+          ${customRows || '<p class="text-sm text-muted" style="padding:0.5rem 0">No custom fields yet.</p>'}
+        </div>
+        <button class="btn btn-secondary btn-sm" id="sf-add-custom-btn">+ Add Custom Field</button>
+      </section>
+
+      <!-- Custom field editor (hidden by default) -->
+      <div id="sf-custom-editor" style="display:none">
+        <section class="settings-section">
+          <div class="card">
+            <h3 class="card-title mb-3" id="sf-editor-title">New Custom Field</h3>
+            <div class="form-group">
+              <label class="form-label" for="sf-cf-label">Name</label>
+              <input class="form-input" type="text" id="sf-cf-label" placeholder="e.g. Big Match Night" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sf-cf-type">Returns</label>
+              <select class="form-input" id="sf-cf-type">
+                <option value="boolean">Boolean (yes/no condition)</option>
+                <option value="number">Number (use with =, >, &lt;, etc.)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sf-cf-expr">Expression <span class="text-muted">(JS, variable: <code>row</code>)</span></label>
+              <textarea class="form-input" id="sf-cf-expr" rows="3"
+                placeholder="row.playerCount > 3"
+                style="font-family:monospace;font-size:0.85rem;resize:vertical"></textarea>
+              <div class="form-hint">Available: row.playerCount, row.matchIndexInNight, row.dayOfWeek, row.month, row.year, row.quarter, row.isWinner, row.isFirstOut, row.roundNumber, row.value, row.scoringMode, row.gameName, row.playerName, row.nightDate, row.matchPlayerIds</div>
+            </div>
+            <div id="sf-cf-test-result" style="min-height:1.5rem;font-size:0.85rem;margin-bottom:0.5rem"></div>
+            <div class="btn-group">
+              <button class="btn btn-secondary" id="sf-cf-cancel">Cancel</button>
+              <button class="btn btn-secondary" id="sf-cf-test">Test Expression</button>
+              <button class="btn btn-primary flex-1" id="sf-cf-save">Save Field</button>
+            </div>
+          </div>
+        </section>
+      </div>
     `;
   }
 
@@ -461,6 +560,151 @@ export class Settings {
     this.bindDataButtons();
     this.bindThemeToggle();
     this.bindColorSwatches();
+    this.bindStatsFields();
+  }
+
+  private _editingCustomId: string | null = null;
+
+  private bindStatsFields(): void {
+    // Built-in toggles
+    document.querySelectorAll<HTMLInputElement>('.sf-builtin-toggle').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const key = cb.dataset['fieldKey']!;
+        this.fieldConfig.builtinEnabled[key] = cb.checked;
+        saveFieldConfig(this.fieldConfig);
+        this._refreshStatsTab();
+      });
+    });
+
+    // Reorder up
+    document.querySelectorAll<HTMLButtonElement>('.sf-up').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset['fieldKey']!;
+        const idx = this.fieldConfig.builtinOrder.indexOf(key);
+        if (idx > 0) {
+          [this.fieldConfig.builtinOrder[idx - 1], this.fieldConfig.builtinOrder[idx]] =
+          [this.fieldConfig.builtinOrder[idx],     this.fieldConfig.builtinOrder[idx - 1]];
+          saveFieldConfig(this.fieldConfig);
+          this._refreshStatsTab();
+        }
+      });
+    });
+
+    // Reorder down
+    document.querySelectorAll<HTMLButtonElement>('.sf-down').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset['fieldKey']!;
+        const idx = this.fieldConfig.builtinOrder.indexOf(key);
+        const len = this.fieldConfig.builtinOrder.length;
+        if (idx < len - 1) {
+          [this.fieldConfig.builtinOrder[idx], this.fieldConfig.builtinOrder[idx + 1]] =
+          [this.fieldConfig.builtinOrder[idx + 1], this.fieldConfig.builtinOrder[idx]];
+          saveFieldConfig(this.fieldConfig);
+          this._refreshStatsTab();
+        }
+      });
+    });
+
+    // Delete custom field
+    document.querySelectorAll<HTMLButtonElement>('.sf-del-custom').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset['customId']!;
+        this.fieldConfig.customFields = this.fieldConfig.customFields.filter(cf => cf.id !== id);
+        saveFieldConfig(this.fieldConfig);
+        this._refreshStatsTab();
+      });
+    });
+
+    // Edit custom field
+    document.querySelectorAll<HTMLButtonElement>('.sf-edit-custom').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset['customId']!;
+        const cf = this.fieldConfig.customFields.find(c => c.id === id);
+        if (!cf) return;
+        this._editingCustomId = id;
+        this._showCustomEditor(cf.label, cf.type, cf.expression);
+      });
+    });
+
+    // Add custom field button
+    document.getElementById('sf-add-custom-btn')?.addEventListener('click', () => {
+      this._editingCustomId = null;
+      this._showCustomEditor('', 'boolean', '');
+    });
+
+    // Editor: cancel
+    document.getElementById('sf-cf-cancel')?.addEventListener('click', () => {
+      this._hideCustomEditor();
+    });
+
+    // Editor: test expression
+    document.getElementById('sf-cf-test')?.addEventListener('click', () => {
+      const expr = (document.getElementById('sf-cf-expr') as HTMLTextAreaElement)?.value ?? '';
+      const resultEl = document.getElementById('sf-cf-test-result');
+      if (!resultEl) return;
+      try {
+        // eslint-disable-next-line no-new-func
+        const fn = new Function('row', `"use strict"; return (${expr});`);
+        const sampleRow = { playerCount: 4, matchIndexInNight: 0, dayOfWeek: 5, month: 6, year: 2025,
+          quarter: 2, isWinner: true, isFirstOut: false, roundNumber: 3, value: 42,
+          scoringMode: 'high', gameName: 'Catan', playerName: 'Player', nightDate: '2025-06-01',
+          matchPlayerIds: [1, 2, 3, 4] };
+        const result = fn(sampleRow);
+        resultEl.innerHTML = `<span style="color:var(--success)">✓ Result on sample row: <strong>${JSON.stringify(result)}</strong></span>`;
+      } catch (e) {
+        resultEl.innerHTML = `<span style="color:var(--danger)">✗ Error: ${escHtml(String(e))}</span>`;
+      }
+    });
+
+    // Editor: save
+    document.getElementById('sf-cf-save')?.addEventListener('click', () => {
+      const label = (document.getElementById('sf-cf-label') as HTMLInputElement)?.value.trim() ?? '';
+      const type  = (document.getElementById('sf-cf-type')  as HTMLSelectElement)?.value as 'boolean' | 'number';
+      const expr  = (document.getElementById('sf-cf-expr')  as HTMLTextAreaElement)?.value.trim() ?? '';
+      if (!label) { showToast('Enter a field name', 'error'); return; }
+      if (!expr)  { showToast('Enter an expression', 'error'); return; }
+
+      const key = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 30);
+
+      if (this._editingCustomId) {
+        const idx = this.fieldConfig.customFields.findIndex(cf => cf.id === this._editingCustomId);
+        if (idx !== -1) this.fieldConfig.customFields[idx] = { id: this._editingCustomId, key, label, type, expression: expr };
+      } else {
+        const id = `cf-${Date.now()}`;
+        this.fieldConfig.customFields.push({ id, key, label, type, expression: expr });
+      }
+
+      saveFieldConfig(this.fieldConfig);
+      this._editingCustomId = null;
+      this._refreshStatsTab();
+    });
+  }
+
+  private _showCustomEditor(label: string, type: string, expr: string): void {
+    const editor = document.getElementById('sf-custom-editor');
+    if (!editor) return;
+    editor.style.display = '';
+    (document.getElementById('sf-cf-label') as HTMLInputElement).value = label;
+    (document.getElementById('sf-cf-type')  as HTMLSelectElement).value = type;
+    (document.getElementById('sf-cf-expr')  as HTMLTextAreaElement).value = expr;
+    const title = document.getElementById('sf-editor-title');
+    if (title) title.textContent = label ? `Edit: ${label}` : 'New Custom Field';
+    const result = document.getElementById('sf-cf-test-result');
+    if (result) result.innerHTML = '';
+    editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  private _hideCustomEditor(): void {
+    const editor = document.getElementById('sf-custom-editor');
+    if (editor) editor.style.display = 'none';
+    this._editingCustomId = null;
+  }
+
+  private _refreshStatsTab(): void {
+    const panel = document.getElementById('settings-tab-stats');
+    if (!panel) return;
+    panel.innerHTML = this.renderStatsFieldsTab();
+    this.bindStatsFields();
   }
 
   private bindFirebaseSection(): void {

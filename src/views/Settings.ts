@@ -16,12 +16,6 @@ import { escHtml } from '../utils';
 import { PLAYER_COLORS } from '../constants';
 import type { Player, Game, SyncConfig, FirebaseRoomConfig } from '../types';
 
-const PLAYER_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#eab308',
-  '#10b981', '#14b8a6', '#3b82f6', '#6366f1',
-  '#8b5cf6', '#ec4899', '#64748b', '#d97706',
-];
-
 export class Settings {
   private players: Player[] = [];
   private games: Game[] = [];
@@ -29,10 +23,6 @@ export class Settings {
   private roomConfig: FirebaseRoomConfig | null = null;
   private editingPlayerId: number | null = null;
   private editingGameId: number | null = null;
-  private pendingCustomFields: CustomField[] = [];
-  private pendingFieldIcon = '';
-  private iconPickerOpen = false;
-  private _cfieldOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
   async load(): Promise<void> {
     const [players, games] = await Promise.all([getPlayers(), getGames()]);
@@ -458,129 +448,6 @@ export class Settings {
         </div>
       </form>
     `;
-  }
-
-  private renderCustomFieldsList(): string {
-    if (this.pendingCustomFields.length === 0) {
-      return '<p class="text-xs text-muted" style="margin:0.25rem 0 0.5rem">No custom fields yet.</p>';
-    }
-    return this.pendingCustomFields.map((f, i) => `
-      <div class="cfield-row">
-        ${f.icon ? `<span class="cfield-row-icon">${f.icon}</span>` : ''}
-        <span class="cfield-row-label">${this.escHtml(f.label)}</span>
-        <span class="badge badge-secondary">${f.type === 'pick-one' ? 'Pick one' : 'Number'}</span>
-        <span class="badge badge-secondary">${f.scope === 'player' ? 'per player' : 'per match'}</span>
-        <span class="badge badge-secondary">${f.trigger === 'per-round' ? 'per round' : 'per match'}</span>
-        <button type="button" class="btn btn-icon btn-sm remove-cfield-btn" data-index="${i}" aria-label="Remove field">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    `).join('');
-  }
-
-  private makeFieldId(label: string): string {
-    const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'field';
-    if (!this.pendingCustomFields.find(f => f.id === base)) return base;
-    let n = 2;
-    while (this.pendingCustomFields.find(f => f.id === `${base}_${n}`)) n++;
-    return `${base}_${n}`;
-  }
-
-  private bindCustomFieldsButtons(): void {
-    const typeEl = document.getElementById('cfield-type') as HTMLSelectElement | null;
-    const scopeEl = document.getElementById('cfield-scope') as HTMLSelectElement | null;
-    const updateScopeVisibility = () => {
-      if (scopeEl) scopeEl.style.display = typeEl?.value === 'pick-one' ? 'none' : '';
-    };
-    updateScopeVisibility();
-    typeEl?.addEventListener('change', updateScopeVisibility);
-
-    // Clone-replace #icon-picker-toggle to discard accumulated listeners
-    const oldToggle = document.getElementById('icon-picker-toggle');
-    if (oldToggle) {
-      const newToggle = oldToggle.cloneNode(true) as HTMLButtonElement;
-      newToggle.textContent = this.pendingFieldIcon || '＋';
-      oldToggle.replaceWith(newToggle);
-      newToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.iconPickerOpen = !this.iconPickerOpen;
-        const grid = document.getElementById('icon-picker-grid');
-        if (grid) grid.style.display = this.iconPickerOpen ? '' : 'none';
-        newToggle.setAttribute('aria-expanded', String(this.iconPickerOpen));
-      });
-    }
-
-    // Clone-replace #icon-picker-grid to discard accumulated listeners; use delegated click
-    const oldGrid = document.getElementById('icon-picker-grid');
-    if (oldGrid) {
-      const newGrid = oldGrid.cloneNode(true) as HTMLElement;
-      newGrid.querySelectorAll<HTMLButtonElement>('.emoji-opt').forEach(b => {
-        b.classList.toggle('emoji-opt--selected', b.dataset['emoji'] === this.pendingFieldIcon && this.pendingFieldIcon !== '');
-      });
-      oldGrid.replaceWith(newGrid);
-      newGrid.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const btn = (e.target as Element).closest<HTMLButtonElement>('.emoji-opt');
-        if (!btn) return;
-        this.pendingFieldIcon = btn.dataset['emoji'] ?? '';
-        this.iconPickerOpen = false;
-        newGrid.style.display = 'none';
-        const toggle = document.getElementById('icon-picker-toggle');
-        if (toggle) toggle.textContent = this.pendingFieldIcon || '＋';
-        newGrid.querySelectorAll<HTMLButtonElement>('.emoji-opt').forEach(b => {
-          b.classList.toggle('emoji-opt--selected', b.dataset['emoji'] === this.pendingFieldIcon && this.pendingFieldIcon !== '');
-        });
-      });
-    }
-
-    // Remove stale document handler, then add fresh one
-    if (this._cfieldOutsideHandler) {
-      document.removeEventListener('click', this._cfieldOutsideHandler);
-    }
-    this._cfieldOutsideHandler = (e: MouseEvent) => {
-      if (!(e.target as Element).closest('.icon-picker-wrap')) {
-        this.iconPickerOpen = false;
-        const grid = document.getElementById('icon-picker-grid');
-        if (grid) grid.style.display = 'none';
-      }
-    };
-    document.addEventListener('click', this._cfieldOutsideHandler);
-
-    // Clone-replace #add-cfield-btn to discard accumulated listeners
-    const oldAddBtn = document.getElementById('add-cfield-btn');
-    if (oldAddBtn) {
-      const newAddBtn = oldAddBtn.cloneNode(true) as HTMLButtonElement;
-      oldAddBtn.replaceWith(newAddBtn);
-      newAddBtn.addEventListener('click', () => {
-        const labelEl = document.getElementById('cfield-label') as HTMLInputElement | null;
-        const label = labelEl?.value.trim() ?? '';
-        if (!label) { showToast('Enter a field label', 'error'); return; }
-        const tEl = document.getElementById('cfield-type') as HTMLSelectElement | null;
-        const sEl = document.getElementById('cfield-scope') as HTMLSelectElement | null;
-        const type = (tEl?.value ?? 'pick-one') as CustomField['type'];
-        const scope: CustomField['scope'] = type === 'pick-one' ? 'player' : ((sEl?.value ?? 'player') as CustomField['scope']);
-        const trigger = ((document.getElementById('cfield-trigger') as HTMLSelectElement)?.value ?? 'per-round') as CustomField['trigger'];
-        const icon = this.pendingFieldIcon || undefined;
-        this.pendingCustomFields.push({ id: this.makeFieldId(label), label, type, scope, trigger, ...(icon ? { icon } : {}) });
-        const listEl = document.getElementById('custom-fields-list');
-        if (listEl) listEl.innerHTML = this.renderCustomFieldsList();
-        if (labelEl) labelEl.value = '';
-        this.pendingFieldIcon = '';
-        this.iconPickerOpen = false;
-        this.bindCustomFieldsButtons();
-      });
-    }
-
-    // .remove-cfield-btn buttons are always fresh DOM (re-rendered inside #custom-fields-list)
-    document.querySelectorAll<HTMLButtonElement>('.remove-cfield-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const idx = parseInt((e.currentTarget as HTMLElement).dataset['index'] ?? '0', 10);
-        this.pendingCustomFields.splice(idx, 1);
-        const listEl = document.getElementById('custom-fields-list');
-        if (listEl) listEl.innerHTML = this.renderCustomFieldsList();
-        this.bindCustomFieldsButtons();
-      });
-    });
   }
 
   afterRender(): void {

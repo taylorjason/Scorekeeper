@@ -61,7 +61,8 @@ async function loadView(parsed: ParsedRoute): Promise<void> {
       const view = new Stats();
       await view.load();
       container.innerHTML = view.render();
-      view.afterRender();
+      void view.afterRender();
+      _viewTeardown = () => view.teardown();
       break;
     }
     case 'settings': {

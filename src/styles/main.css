@@ -2910,3 +2910,29 @@ button, input, select, textarea {
   height: 48px;
   font-size: 1rem;
 }
+
+/* ─── Custom Stats Tab ───────────────────────────────────────────────────────── */
+.custom-stat-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 4rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.custom-stat-result {
+  margin-top: 0.5rem;
+}
+.custom-stat-error {
+  font-size: 0.85rem;
+  color: var(--danger);
+  background: rgba(239,68,68,0.08);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+}
+.custom-stat-text-result {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+  padding: 0.25rem 0;
+}
+

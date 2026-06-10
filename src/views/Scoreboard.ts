@@ -259,8 +259,14 @@ export class Scoreboard {
       const durHtml = dur !== undefined ? ` <span class="sbt-dur">${formatDuration(dur)}</span>` : '';
       const cells = this.players.map(p => {
         const entry = this.entries.find(e => e.playerId === p.id && e.roundNumber === r);
-        const content = entry != null ? String(entry.value) : '—';
-        return `<td class="sbt-cell">${content}</td>`;
+        if (entry == null) return `<td class="sbt-cell">—</td>`;
+        let fo = false;
+        if (entry.note === 'first_out') {
+          fo = true;
+        } else if (entry.note) {
+          try { fo = !!(JSON.parse(entry.note) as { firstOut?: boolean }).firstOut; } catch { /* ignore */ }
+        }
+        return `<td class="sbt-cell">${fo ? '⚡ ' : ''}${entry.value}</td>`;
       }).join('');
       return `<tr><td class="sbt-label">${escHtml(this._roundLabel(r))}${durHtml}</td>${cells}</tr>`;
     }).join('');

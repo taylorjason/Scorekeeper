@@ -73,34 +73,50 @@ export async function generateStatCode(
   apiKey: string,
   sampleRows: StatRow[],
 ): Promise<string> {
+  if (!apiKey.startsWith('sk-ant-')) {
+    throw new Error('Invalid API key format — should start with "sk-ant-"');
+  }
+
   const sample = JSON.stringify(sampleRows.slice(0, 5), null, 2);
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{
-        role: 'user',
-        content: `Stat to compute: "${description}"\n\nSample data (first 5 rows):\n${sample}\n\nGenerate the JavaScript function body now.`,
-      }],
-    }),
-  });
+  let resp: Response;
+  try {
+    resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: `Stat to compute: "${description}"\n\nSample data (first 5 rows):\n${sample}\n\nGenerate the JavaScript function body now.`,
+        }],
+      }),
+    });
+  } catch (networkErr) {
+    // Network-level failure (CORS, no internet, DNS, content blocker)
+    const msg = networkErr instanceof Error ? networkErr.message : String(networkErr);
+    console.error('[custom-stats] Network error calling Anthropic API:', networkErr);
+    throw new Error(`Network error: ${msg}. Check your internet connection or try disabling content blockers.`);
+  }
 
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`API error ${resp.status}: ${body}`);
+    console.error('[custom-stats] API error', resp.status, body);
+    let detail = '';
+    try { detail = (JSON.parse(body) as { error?: { message?: string } }).error?.message ?? body; }
+    catch { detail = body; }
+    throw new Error(`API error ${resp.status}: ${detail}`);
   }
 
   const data = await resp.json() as { content: Array<{ type: string; text: string }> };
   const text = data.content.find(c => c.type === 'text')?.text ?? '';
-  // Strip any accidental markdown fences
   return text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
 }
 

@@ -59,6 +59,22 @@ export class ActiveMatch {
     }).length;
   }
 
+  /** Compute which sequential phase a player was on at the START of a given round. */
+  private getPlayerPhaseAtRound(player: Player, roundNumber: number): number {
+    const prior = this.entries
+      .filter(e => e.playerId === player.id && e.roundNumber < roundNumber)
+      .sort((a, b) => a.roundNumber - b.roundNumber);
+    let phase = 1;
+    for (const e of prior) {
+      if (!e.note) continue;
+      try {
+        const d = JSON.parse(e.note) as { phase?: number; completed?: boolean };
+        if (d.completed && d.phase === phase) phase = Math.min(phase + 1, this.totalPhases() + 1);
+      } catch { /* ignore */ }
+    }
+    return phase;
+  }
+
   async load(matchId: number): Promise<void> {
     this.matchId = matchId;
     this.match = (await getMatch(matchId)) ?? null;
@@ -234,11 +250,12 @@ export class ActiveMatch {
         const editAttrs = `data-entry-id="${entry.id}" data-player-id="${p.id}" data-round="${rn}"`;
         if (isPhase10) {
           try {
-            const data = JSON.parse(entry.note ?? '{}') as { phase?: number; completed?: boolean; firstOut?: boolean };
-            const phaseLabel = data.phase ? this.phaseLabel(data.phase) : '';
+            const data = JSON.parse(entry.note ?? '{}') as { completed?: boolean; firstOut?: boolean };
+            const phaseAtRound = this.getPlayerPhaseAtRound(p, rn);
+            const phaseLbl = this.phaseLabel(phaseAtRound);
             const completedMark = data.completed ? ' ✓' : '';
             const foMark = data.firstOut ? ' ⚡' : '';
-            return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
+            return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLbl}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
           } catch { /* fall through */ }
         }
         const firstOut = entry.note === 'first_out';
@@ -720,7 +737,19 @@ export class ActiveMatch {
         const entry = this.entries.find(e => e.id === entryId);
         const player = this.players.find(p => p.id === playerId);
         if (!entry || !player) return;
-        this.showEditModal(entryId, entry.value, player.displayName, this.roundLabel(rn));
+        let phase10Data: { phaseNum: number; phaseLabel: string; completed: boolean; firstOut: boolean } | undefined;
+        if (this.game?.scoringMode === 'phase10') {
+          const phaseNum = this.getPlayerPhaseAtRound(player, rn);
+          let completed = false;
+          let firstOut = false;
+          try {
+            const d = JSON.parse(entry.note ?? '{}') as { completed?: boolean; firstOut?: boolean };
+            completed = !!d.completed;
+            firstOut = !!d.firstOut;
+          } catch { /* ignore */ }
+          phase10Data = { phaseNum, phaseLabel: this.phaseLabel(phaseNum), completed, firstOut };
+        }
+        this.showEditModal(entryId, entry.value, player.displayName, this.roundLabel(rn), phase10Data);
       });
     });
 
@@ -894,7 +923,13 @@ export class ActiveMatch {
     }
   }
 
-  private showEditModal(entryId: number, currentValue: number, playerName: string, roundLbl: string): void {
+  private showEditModal(
+    entryId: number,
+    currentValue: number,
+    playerName: string,
+    roundLbl: string,
+    phase10?: { phaseNum: number; phaseLabel: string; completed: boolean; firstOut: boolean }
+  ): void {
     document.getElementById('score-edit-modal')?.remove();
 
     const overlay = document.createElement('div');
@@ -905,11 +940,18 @@ export class ActiveMatch {
         <div class="modal-message">
           <div id="edit-modal-title" style="font-weight:600; margin-bottom:0.75rem">
             ${escHtml(playerName)} — ${escHtml(roundLbl)}
+            ${phase10 ? `<span class="text-sm text-muted" style="font-weight:400"> · ${escHtml(phase10.phaseLabel)}</span>` : ''}
           </div>
           <input class="form-input" type="number" id="edit-score-input"
             value="${currentValue}" step="1"
             style="text-align:center; font-size:1.25rem; width:100%"
             aria-label="Score value" />
+          ${phase10 ? `
+            <label class="flex items-center gap-2 mt-3" style="cursor:pointer; user-select:none">
+              <input type="checkbox" id="edit-completed-input" style="width:18px;height:18px" ${phase10.completed ? 'checked' : ''}>
+              <span class="text-sm">Completed ${escHtml(phase10.phaseLabel)}</span>
+            </label>
+          ` : ''}
         </div>
         <div class="modal-actions">
           <button class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
@@ -930,8 +972,17 @@ export class ActiveMatch {
     const save = async () => {
       const newValue = parseFloat(input.value);
       if (isNaN(newValue)) { showToast('Invalid score', 'error'); return; }
+      const updates: Partial<ScoreEntry> = { value: newValue };
+      if (phase10) {
+        const newCompleted = (overlay.querySelector<HTMLInputElement>('#edit-completed-input')?.checked) ?? phase10.completed;
+        updates.note = JSON.stringify({
+          phase: phase10.phaseNum,
+          completed: newCompleted,
+          ...(phase10.firstOut ? { firstOut: true } : {}),
+        });
+      }
       try {
-        await db.scoreEntries.update(entryId, { value: newValue });
+        await db.scoreEntries.update(entryId, updates);
         close();
         showToast('Score updated', 'success');
         await this.load(this.matchId);

@@ -831,9 +831,10 @@ export class ActiveMatch {
         }
       }
 
-      // Auto-finish when all labeled rounds have been played
+      // Auto-finish when all labeled rounds have been played (not applicable to phase10,
+      // where roundLabels are phase names not hand counts — phases finish independently)
       const labels = this.game?.roundLabels;
-      if (labels && labels.length > 0 && this.currentRound > labels.length) {
+      if (mode !== 'phase10' && labels && labels.length > 0 && this.currentRound > labels.length) {
         await this.handleFinishMatch();
         return;
       }

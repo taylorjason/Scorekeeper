@@ -108,6 +108,15 @@ export class Scoreboard {
     return this.game?.roundLabels?.length ?? 10;
   }
 
+  private _getPhaseAttemptCount(player: Player, phase: number): number {
+    return this.entries.filter(e => {
+      if (e.playerId !== player.id) return false;
+      try {
+        return (JSON.parse(e.note ?? '{}') as { phase?: number }).phase === phase;
+      } catch { return false; }
+    }).length;
+  }
+
   private _isTied(a: PlayerScore, b: PlayerScore): boolean {
     if (this.game?.scoringMode === 'phase10') {
       return (a.phase ?? 1) === (b.phase ?? 1) && a.total === b.total;
@@ -202,8 +211,10 @@ export class Scoreboard {
       if (isPhase10) {
         const phase = ps.phase ?? 1;
         const done = phase > this._totalPhases();
+        const attempts = done ? 0 : this._getPhaseAttemptCount(ps.player, phase);
+        const attemptBadge = attempts >= 2 ? `<span class="phase-attempt-badge">${attempts}x</span>` : '';
         scoreHtml = `
-          <div class="sb-phase">${done ? '🏆 Done' : this._phaseLabel(phase)}</div>
+          <div class="sb-phase">${done ? '🏆 Done' : this._phaseLabel(phase)}${attemptBadge}</div>
           <div class="sb-penalty">${ps.total} pts</div>
           ${leaderBadge}`;
       } else {

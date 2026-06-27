@@ -834,17 +834,9 @@ export class ActiveMatch {
       // Reload and re-render
       await this.load(this.matchId);
 
-      // Phase 10: check if any player just completed phase 10
-      if (mode === 'phase10') {
-        const anyFinished = this.players.some(p => this.getPlayerCurrentPhase(p) > 10);
-        if (anyFinished) {
-          await this.handleFinishMatch();
-          return;
-        }
-      }
-
-      // Auto-finish when all labeled rounds have been played (not applicable to phase10,
-      // where roundLabels are phase names not hand counts — phases finish independently)
+      // Auto-finish when all labeled rounds have been played.
+      // Phase 10 is excluded: roundLabels hold phase names, not hand counts,
+      // and players finish phases independently so there's no clean last round.
       const labels = this.game?.roundLabels;
       if (mode !== 'phase10' && labels && labels.length > 0 && this.currentRound > labels.length) {
         await this.handleFinishMatch();

@@ -37,6 +37,18 @@ export class ActiveMatch {
     return `Round ${roundNumber}`;
   }
 
+  /** Return the display label for a sequential phase number (1-based). */
+  private phaseLabel(n: number): string {
+    const labels = this.game?.roundLabels;
+    if (labels && labels.length >= n) return labels[n - 1];
+    return `Phase ${n}`;
+  }
+
+  /** Total number of phases in this game (defaults to 10). */
+  private totalPhases(): number {
+    return this.game?.roundLabels?.length ?? 10;
+  }
+
   async load(matchId: number): Promise<void> {
     this.matchId = matchId;
     this.match = (await getMatch(matchId)) ?? null;
@@ -91,7 +103,7 @@ export class ActiveMatch {
       try {
         const data = JSON.parse(e.note) as { phase?: number; completed?: boolean };
         if (data.completed && data.phase === phase) {
-          phase = Math.min(phase + 1, 11);
+          phase = Math.min(phase + 1, this.totalPhases() + 1);
         }
       } catch { /* plain note like 'first_out', ignore */ }
     }
@@ -213,7 +225,7 @@ export class ActiveMatch {
         if (isPhase10) {
           try {
             const data = JSON.parse(entry.note ?? '{}') as { phase?: number; completed?: boolean; firstOut?: boolean };
-            const phaseLabel = data.phase ? `Ph.${data.phase}` : '';
+            const phaseLabel = data.phase ? this.phaseLabel(data.phase) : '';
             const completedMark = data.completed ? ' ✓' : '';
             const foMark = data.firstOut ? ' ⚡' : '';
             return `<td class="score-table-score score-cell-editable" ${editAttrs}>${phaseLabel}${completedMark}${foMark}<br><small>${entry.value}pts</small></td>`;
@@ -289,16 +301,16 @@ export class ActiveMatch {
       const isDealer = ps.player.id === dealerId;
       if (isPhase10) {
         const phase = this.getPlayerCurrentPhase(ps.player);
-        const isDone = phase > 10;
+        const isDone = phase > this.totalPhases();
         return `
-          <div class="score-card ${this.rankClass(er)}" aria-label="${escHtml(ps.player.displayName)}: Phase ${isDone ? '10 done' : phase}, ${ps.total} pts">
+          <div class="score-card ${this.rankClass(er)}" aria-label="${escHtml(ps.player.displayName)}: ${isDone ? 'done' : this.phaseLabel(phase)}, ${ps.total} pts">
             ${er < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(er)}</span>` : ''}
             ${isDealer ? '<span class="dealer-badge dealer-badge--card" title="Current dealer">🃏</span>' : ''}
             <div class="player-avatar" style="background:${ps.player.color}">
               ${ps.player.displayName.charAt(0).toUpperCase()}
             </div>
             <div class="player-name">${escHtml(ps.player.displayName)}</div>
-            <div class="score-total" style="font-size:1.1rem">${isDone ? '🏆 Done' : `Ph.${phase}`}</div>
+            <div class="score-total" style="font-size:1.1rem">${isDone ? '🏆 Done' : this.phaseLabel(phase)}</div>
             <div class="text-xs text-muted">${ps.total} penalty pts</div>
           </div>
         `;
@@ -332,7 +344,7 @@ export class ActiveMatch {
       if (mode === 'phase10') {
         const playerRows = this.players.map(p => {
           const phase = this.getPlayerCurrentPhase(p);
-          const isDone = phase > 10;
+          const isDone = phase > this.totalPhases();
           if (isDone) {
             return `
               <div class="phase10-player-row" data-player-id="${p.id}" style="opacity:0.6">
@@ -349,7 +361,7 @@ export class ActiveMatch {
               <div class="flex items-center gap-2 mb-1">
                 <span class="player-dot" style="background:${p.color}"></span>
                 <span class="font-semibold">${escHtml(p.displayName)}</span>
-                <span class="phase10-badge">Phase ${phase}</span>
+                <span class="phase10-badge">${this.phaseLabel(phase)}</span>
               </div>
               <div class="flex items-center gap-3 flex-wrap">
                 <div style="display:flex; flex-direction:column; align-items:center; gap:2px">
@@ -360,7 +372,7 @@ export class ActiveMatch {
                 </div>
                 <label class="flex items-center gap-2" style="cursor:pointer; padding: 4px 0">
                   <input type="checkbox" id="completed-${p.id}" style="width:18px; height:18px">
-                  <span class="text-sm">Completed Phase ${phase}</span>
+                  <span class="text-sm">Completed ${this.phaseLabel(phase)}</span>
                 </label>
               </div>
             </div>
@@ -753,7 +765,7 @@ export class ActiveMatch {
       const firstOutId = (document.getElementById('first-out-select') as HTMLSelectElement)?.value ?? '';
       for (const player of this.players) {
         const phase = this.getPlayerCurrentPhase(player);
-        if (phase > 10) continue; // already completed all phases, skip
+        if (phase > this.totalPhases()) continue; // already completed all phases, skip
         const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
         const penaltyPts = parseFloat(input?.value ?? '0') || 0;
         const completed = (document.getElementById(`completed-${player.id}`) as HTMLInputElement)?.checked ?? false;

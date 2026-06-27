@@ -64,7 +64,7 @@ export class Scoreboard {
       if (!e.note) continue;
       try {
         const d = JSON.parse(e.note) as { phase?: number; completed?: boolean };
-        if (d.completed && d.phase === phase) phase = Math.min(phase + 1, 11);
+        if (d.completed && d.phase === phase) phase = Math.min(phase + 1, this._totalPhases() + 1);
       } catch { /* ignore */ }
     }
     return phase;
@@ -96,6 +96,16 @@ export class Scoreboard {
     const labels = this.game?.roundLabels;
     if (labels && labels.length >= roundNumber) return labels[roundNumber - 1];
     return `Round ${roundNumber}`;
+  }
+
+  private _phaseLabel(n: number): string {
+    const labels = this.game?.roundLabels;
+    if (labels && labels.length >= n) return labels[n - 1];
+    return `Phase ${n}`;
+  }
+
+  private _totalPhases(): number {
+    return this.game?.roundLabels?.length ?? 10;
   }
 
   private _isTied(a: PlayerScore, b: PlayerScore): boolean {
@@ -191,9 +201,9 @@ export class Scoreboard {
       let scoreHtml: string;
       if (isPhase10) {
         const phase = ps.phase ?? 1;
-        const done = phase > 10;
+        const done = phase > this._totalPhases();
         scoreHtml = `
-          <div class="sb-phase">${done ? '🏆 Done' : `Phase ${phase}`}</div>
+          <div class="sb-phase">${done ? '🏆 Done' : this._phaseLabel(phase)}</div>
           <div class="sb-penalty">${ps.total} pts</div>
           ${leaderBadge}`;
       } else {

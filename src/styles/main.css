@@ -2438,6 +2438,12 @@ button, input, select, textarea {
   color: #51f8e4;
   line-height: 1.1;
 }
+.sb-phase .phase-attempt-badge {
+  font-size: 0.8em;
+  padding: 0.05em 0.3em;
+  border-radius: 0.25em;
+  vertical-align: middle;
+}
 .sb-penalty {
   font-size: clamp(1.65rem, 3.3vw, 2.47rem);
   font-weight: 600;

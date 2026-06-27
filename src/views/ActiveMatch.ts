@@ -608,7 +608,7 @@ export class ActiveMatch {
               const dealer = dealerId !== null ? this.players.find(p => p.id === dealerId) : null;
               return `<div class="current-round-banner" aria-label="Current round">
                 <span class="round-banner-label">Now scoring</span>
-                ${escHtml(this.roundLabel(this.currentRound))}
+                ${escHtml(isPhase10 ? `Hand ${this.currentRound}` : this.roundLabel(this.currentRound))}
                 ${dealer ? `<span class="dealer-pill">🃏 ${escHtml(dealer.displayName)}</span>` : ''}
                 <span class="round-timer" id="round-timer-display" aria-label="Round elapsed time">⏱ ${formatDuration(Date.now() - this._roundStartMs)}</span>
               </div>`;

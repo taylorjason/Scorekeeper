@@ -49,6 +49,16 @@ export class ActiveMatch {
     return this.game?.roundLabels?.length ?? 10;
   }
 
+  /** Count how many hands a player has spent attempting a given sequential phase. */
+  private getPhaseAttemptCount(player: Player, phase: number): number {
+    return this.entries.filter(e => {
+      if (e.playerId !== player.id) return false;
+      try {
+        return (JSON.parse(e.note ?? '{}') as { phase?: number }).phase === phase;
+      } catch { return false; }
+    }).length;
+  }
+
   async load(matchId: number): Promise<void> {
     this.matchId = matchId;
     this.match = (await getMatch(matchId)) ?? null;
@@ -302,6 +312,8 @@ export class ActiveMatch {
       if (isPhase10) {
         const phase = this.getPlayerCurrentPhase(ps.player);
         const isDone = phase > this.totalPhases();
+        const attempts = isDone ? 0 : this.getPhaseAttemptCount(ps.player, phase);
+        const attemptBadge = attempts >= 2 ? `<span class="phase-attempt-badge">${attempts}x</span>` : '';
         return `
           <div class="score-card ${this.rankClass(er)}" aria-label="${escHtml(ps.player.displayName)}: ${isDone ? 'done' : this.phaseLabel(phase)}, ${ps.total} pts">
             ${er < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(er)}</span>` : ''}
@@ -310,7 +322,7 @@ export class ActiveMatch {
               ${ps.player.displayName.charAt(0).toUpperCase()}
             </div>
             <div class="player-name">${escHtml(ps.player.displayName)}</div>
-            <div class="score-total" style="font-size:1.1rem">${isDone ? '🏆 Done' : this.phaseLabel(phase)}</div>
+            <div class="score-total" style="font-size:1.1rem">${isDone ? '🏆 Done' : this.phaseLabel(phase)}${attemptBadge}</div>
             <div class="text-xs text-muted">${ps.total} penalty pts</div>
           </div>
         `;
@@ -608,7 +620,7 @@ export class ActiveMatch {
               const dealer = dealerId !== null ? this.players.find(p => p.id === dealerId) : null;
               return `<div class="current-round-banner" aria-label="Current round">
                 <span class="round-banner-label">Now scoring</span>
-                ${escHtml(this.roundLabel(this.currentRound))}
+                ${escHtml(isPhase10 ? `Hand ${this.currentRound}` : this.roundLabel(this.currentRound))}
                 ${dealer ? `<span class="dealer-pill">🃏 ${escHtml(dealer.displayName)}</span>` : ''}
                 <span class="round-timer" id="round-timer-display" aria-label="Round elapsed time">⏱ ${formatDuration(Date.now() - this._roundStartMs)}</span>
               </div>`;
@@ -831,9 +843,10 @@ export class ActiveMatch {
         }
       }
 
-      // Auto-finish when all labeled rounds have been played
+      // Auto-finish when all labeled rounds have been played (not applicable to phase10,
+      // where roundLabels are phase names not hand counts — phases finish independently)
       const labels = this.game?.roundLabels;
-      if (labels && labels.length > 0 && this.currentRound > labels.length) {
+      if (mode !== 'phase10' && labels && labels.length > 0 && this.currentRound > labels.length) {
         await this.handleFinishMatch();
         return;
       }

@@ -1565,6 +1565,18 @@ button, input, select, textarea {
 .phase10-badge.phase10-done {
   background: var(--success);
 }
+.phase-attempt-badge {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: var(--danger);
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 6px;
+  vertical-align: middle;
+  line-height: 1.4;
+}
 
 /* ─── Modal ─────────────────────────────────────────────────────────────────── */
 #add-match-modal,

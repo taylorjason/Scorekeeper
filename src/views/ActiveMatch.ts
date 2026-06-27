@@ -49,6 +49,16 @@ export class ActiveMatch {
     return this.game?.roundLabels?.length ?? 10;
   }
 
+  /** Count how many hands a player has spent attempting a given sequential phase. */
+  private getPhaseAttemptCount(player: Player, phase: number): number {
+    return this.entries.filter(e => {
+      if (e.playerId !== player.id) return false;
+      try {
+        return (JSON.parse(e.note ?? '{}') as { phase?: number }).phase === phase;
+      } catch { return false; }
+    }).length;
+  }
+
   async load(matchId: number): Promise<void> {
     this.matchId = matchId;
     this.match = (await getMatch(matchId)) ?? null;
@@ -302,6 +312,8 @@ export class ActiveMatch {
       if (isPhase10) {
         const phase = this.getPlayerCurrentPhase(ps.player);
         const isDone = phase > this.totalPhases();
+        const attempts = isDone ? 0 : this.getPhaseAttemptCount(ps.player, phase);
+        const attemptBadge = attempts >= 2 ? `<span class="phase-attempt-badge">${attempts}x</span>` : '';
         return `
           <div class="score-card ${this.rankClass(er)}" aria-label="${escHtml(ps.player.displayName)}: ${isDone ? 'done' : this.phaseLabel(phase)}, ${ps.total} pts">
             ${er < 3 ? `<span class="score-rank" aria-hidden="true">${this.rankIcon(er)}</span>` : ''}
@@ -310,7 +322,7 @@ export class ActiveMatch {
               ${ps.player.displayName.charAt(0).toUpperCase()}
             </div>
             <div class="player-name">${escHtml(ps.player.displayName)}</div>
-            <div class="score-total" style="font-size:1.1rem">${isDone ? '🏆 Done' : this.phaseLabel(phase)}</div>
+            <div class="score-total" style="font-size:1.1rem">${isDone ? '🏆 Done' : this.phaseLabel(phase)}${attemptBadge}</div>
             <div class="text-xs text-muted">${ps.total} penalty pts</div>
           </div>
         `;

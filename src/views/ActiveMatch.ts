@@ -752,18 +752,22 @@ export class ActiveMatch {
         return;
       }
 
+      const idx = this.players.findIndex(p => String(p.id) === selectedId);
+      if (idx === -1) return;
+
       const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'));
-      const firstOutRow = rows.find(r => r.dataset['playerId'] === selectedId);
-      if (!firstOutRow) return;
-      container.insertBefore(firstOutRow, container.firstChild);
+      const rowMap = new Map(rows.map(r => [r.dataset['playerId']!, r]));
+      const rotated = [...this.players.slice(idx), ...this.players.slice(0, idx)];
+      rotated.forEach(p => {
+        const row = rowMap.get(String(p.id));
+        if (row) container.appendChild(row);
+      });
 
       const input = document.getElementById(`score-input-${selectedId}`) as HTMLInputElement | null;
       if (input) input.value = '0';
 
-      const remaining = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'))
-        .filter(r => r.dataset['playerId'] !== selectedId);
-      const nextId = remaining[0]?.dataset['playerId'];
-      if (nextId) (document.getElementById(`score-input-${nextId}`) as HTMLInputElement | null)?.focus();
+      const nextPlayer = rotated[1];
+      if (nextPlayer) (document.getElementById(`score-input-${nextPlayer.id}`) as HTMLInputElement | null)?.focus();
     });
   }
 

@@ -4,6 +4,9 @@ import {
 import { navigate } from '../router';
 import { showToast } from '../toast';
 import { escHtml } from '../utils';
+import {
+  getTotalPhases, getPlayerCurrentPhase, applyFirstOutSelection, reorderPlayerRows, collectRoundEntries,
+} from '../round-entry';
 import type { Match, Game, Player, ScoreEntry } from '../types';
 
 export class ScoreInput {
@@ -41,19 +44,8 @@ export class ScoreInput {
     return labels && labels.length >= n ? labels[n - 1] : `Round ${n}`;
   }
 
-  private getPlayerCurrentPhase(player: Player): number {
-    const sorted = this.entries
-      .filter(e => e.playerId === player.id)
-      .sort((a, b) => a.roundNumber - b.roundNumber);
-    let phase = 1;
-    for (const e of sorted) {
-      if (!e.note) continue;
-      try {
-        const d = JSON.parse(e.note) as { phase?: number; completed?: boolean };
-        if (d.completed && d.phase === phase) phase = Math.min(phase + 1, 11);
-      } catch { /* plain string note */ }
-    }
-    return phase;
+  private currentPhase(player: Player): number {
+    return getPlayerCurrentPhase(this.entries, player.id!, getTotalPhases(this.game?.roundLabels));
   }
 
   render(): string {
@@ -81,8 +73,8 @@ export class ScoreInput {
 
     const playerRows = this.players.map(p => {
       if (isPhase10) {
-        const phase = this.getPlayerCurrentPhase(p);
-        const isDone = phase > 10;
+        const phase = this.currentPhase(p);
+        const isDone = phase > getTotalPhases(this.game?.roundLabels);
         if (isDone) return `
           <div class="si-player" data-player-id="${p.id}" style="opacity:0.45">
             <div class="si-player-bar" style="background:${p.color}"></div>
@@ -188,30 +180,11 @@ export class ScoreInput {
       if (!container) return;
 
       if (!selectedId) {
-        const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'));
-        const rowMap = new Map(rows.map(r => [r.dataset['playerId']!, r]));
-        this.players.forEach(p => {
-          const row = rowMap.get(String(p.id));
-          if (row) container.appendChild(row);
-        });
+        reorderPlayerRows(this.players, container);
         return;
       }
 
-      const idx = this.players.findIndex(p => String(p.id) === selectedId);
-      if (idx === -1) return;
-
-      const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'));
-      const rowMap = new Map(rows.map(r => [r.dataset['playerId']!, r]));
-      const rotated = [...this.players.slice(idx), ...this.players.slice(0, idx)];
-      rotated.forEach(p => {
-        const row = rowMap.get(String(p.id));
-        if (row) container.appendChild(row);
-      });
-
-      const input = document.getElementById(`score-input-${selectedId}`) as HTMLInputElement | null;
-      if (input) input.value = '0';
-
-      const nextPlayer = rotated[1];
+      const nextPlayer = applyFirstOutSelection(this.players, container, selectedId);
       if (nextPlayer) (document.getElementById(`score-input-${nextPlayer.id}`) as HTMLInputElement | null)?.focus();
     });
 
@@ -235,38 +208,9 @@ export class ScoreInput {
   private async handleSave(): Promise<void> {
     if (!this.match || !this.game) return;
     const mode = this.game.scoringMode;
-    const entries: { playerId: number; value: number; note?: string }[] = [];
 
-    if (mode === 'phase10') {
-      for (const player of this.players) {
-        const phase = this.getPlayerCurrentPhase(player);
-        if (phase > 10) continue;
-        const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
-        const penaltyPts = parseFloat(input?.value ?? '0') || 0;
-        const completed = (document.getElementById(`completed-${player.id}`) as HTMLInputElement | null)?.checked ?? false;
-        const note = JSON.stringify({ phase, completed });
-        entries.push({ playerId: player.id!, value: penaltyPts, note });
-      }
-      if (entries.length === 0) { showToast('All players have completed all phases', 'info'); return; }
-    } else if (mode === 'finish-order') {
-      const positions = new Set<number>();
-      for (const player of this.players) {
-        const sel = document.getElementById(`score-input-${player.id}`) as HTMLSelectElement;
-        const pos = parseInt(sel?.value ?? '', 10);
-        if (!pos || isNaN(pos)) { showToast(`Set position for ${player.displayName}`, 'error'); return; }
-        if (positions.has(pos)) { showToast('Each player must have a unique position', 'error'); return; }
-        positions.add(pos);
-        entries.push({ playerId: player.id!, value: this.players.length - pos + 1 });
-      }
-    } else {
-      const firstOutId = (document.getElementById('first-out-select') as HTMLSelectElement | null)?.value ?? '';
-      for (const player of this.players) {
-        const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
-        const val = parseFloat(input?.value ?? '0') || 0;
-        const firstOut = firstOutId === String(player.id);
-        entries.push({ playerId: player.id!, value: val, ...(firstOut ? { note: 'first_out' } : {}) });
-      }
-    }
+    const { entries, error } = collectRoundEntries(mode, this.players, this.entries, getTotalPhases(this.game.roundLabels));
+    if (error) { showToast(error, mode === 'phase10' ? 'info' : 'error'); return; }
 
     const now = Date.now();
     try {

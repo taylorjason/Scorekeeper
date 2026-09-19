@@ -5,6 +5,9 @@ import {
 import { navigate } from '../router';
 import { showToast } from '../toast';
 import { escHtml, formatDuration, computeRoundDurations } from '../utils';
+import {
+  getTotalPhases, getPlayerCurrentPhase, applyFirstOutSelection, reorderPlayerRows, collectRoundEntries,
+} from '../round-entry';
 import type { Match, Game, GameNight, Player, ScoreEntry } from '../types';
 
 interface PlayerScore {
@@ -46,7 +49,7 @@ export class ActiveMatch {
 
   /** Total number of phases in this game (defaults to 10). */
   private totalPhases(): number {
-    return this.game?.roundLabels?.length ?? 10;
+    return getTotalPhases(this.game?.roundLabels);
   }
 
   /** Count how many hands a player has spent attempting a given sequential phase. */
@@ -100,24 +103,11 @@ export class ActiveMatch {
       : (this.match?.createdAt ?? Date.now());
   }
 
-  /** For phase10 mode: return the current phase (1–10) for a player.
+  /** For phase10 mode: return the current phase for a player.
    *  Phase advances when a round entry has note.completed === true for that phase.
-   *  Returns 11 once all 10 phases are done. */
+   *  Returns totalPhases() + 1 once all phases are done. */
   private getPlayerCurrentPhase(player: Player): number {
-    const sorted = this.entries
-      .filter(e => e.playerId === player.id)
-      .sort((a, b) => a.roundNumber - b.roundNumber);
-    let phase = 1;
-    for (const e of sorted) {
-      if (!e.note) continue;
-      try {
-        const data = JSON.parse(e.note) as { phase?: number; completed?: boolean };
-        if (data.completed && data.phase === phase) {
-          phase = Math.min(phase + 1, this.totalPhases() + 1);
-        }
-      } catch { /* plain note like 'first_out', ignore */ }
-    }
-    return phase;
+    return getPlayerCurrentPhase(this.entries, player.id!, this.totalPhases());
   }
 
   private computeScores(): void {
@@ -457,7 +447,7 @@ export class ActiveMatch {
             <span class="player-dot player-dot-lg" style="background:${p.color}"></span>
             <span class="font-semibold flex-1">${escHtml(p.displayName)}</span>
             <select class="form-select" style="max-width:120px; min-height:42px"
-              id="order-input-${p.id}" data-player-id="${p.id}" aria-label="${escHtml(p.displayName)} position">
+              id="score-input-${p.id}" data-player-id="${p.id}" aria-label="${escHtml(p.displayName)} position">
               <option value="">Place</option>
               ${this.players.map((_, i) => `<option value="${i + 1}">${i + 1}${['st','nd','rd'][i] || 'th'}</option>`).join('')}
             </select>
@@ -743,27 +733,12 @@ export class ActiveMatch {
       if (!container) return;
 
       if (!selectedId) {
-        const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'));
-        const rowMap = new Map(rows.map(r => [r.dataset['playerId']!, r]));
-        this.players.forEach(p => {
-          const row = rowMap.get(String(p.id));
-          if (row) container.appendChild(row);
-        });
+        reorderPlayerRows(this.players, container);
         return;
       }
 
-      const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'));
-      const firstOutRow = rows.find(r => r.dataset['playerId'] === selectedId);
-      if (!firstOutRow) return;
-      container.insertBefore(firstOutRow, container.firstChild);
-
-      const input = document.getElementById(`score-input-${selectedId}`) as HTMLInputElement | null;
-      if (input) input.value = '0';
-
-      const remaining = Array.from(container.querySelectorAll<HTMLElement>('[data-player-id]'))
-        .filter(r => r.dataset['playerId'] !== selectedId);
-      const nextId = remaining[0]?.dataset['playerId'];
-      if (nextId) (document.getElementById(`score-input-${nextId}`) as HTMLInputElement | null)?.focus();
+      const nextPlayer = applyFirstOutSelection(this.players, container, selectedId);
+      if (nextPlayer) (document.getElementById(`score-input-${nextPlayer.id}`) as HTMLInputElement | null)?.focus();
     });
   }
 
@@ -771,50 +746,8 @@ export class ActiveMatch {
     if (!this.match || !this.game) return;
     const mode = this.game.scoringMode;
 
-    const entries: { playerId: number; value: number; note?: string }[] = [];
-
-    if (mode === 'phase10') {
-      const firstOutId = (document.getElementById('first-out-select') as HTMLSelectElement)?.value ?? '';
-      for (const player of this.players) {
-        const phase = this.getPlayerCurrentPhase(player);
-        if (phase > this.totalPhases()) continue; // already completed all phases, skip
-        const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
-        const penaltyPts = parseFloat(input?.value ?? '0') || 0;
-        const completed = (document.getElementById(`completed-${player.id}`) as HTMLInputElement)?.checked ?? false;
-        const firstOut = firstOutId === String(player.id);
-        const note = JSON.stringify({ phase, completed, ...(firstOut ? { firstOut: true } : {}) });
-        entries.push({ playerId: player.id!, value: penaltyPts, note });
-      }
-      if (entries.length === 0) {
-        showToast('All players have completed all phases', 'info');
-        return;
-      }
-    } else if (mode === 'finish-order') {
-      const positions = new Set<number>();
-      for (const player of this.players) {
-        const sel = document.getElementById(`order-input-${player.id}`) as HTMLSelectElement;
-        const pos = parseInt(sel?.value ?? '', 10);
-        if (!pos || isNaN(pos)) {
-          showToast(`Set position for ${player.displayName}`, 'error');
-          return;
-        }
-        if (positions.has(pos)) {
-          showToast('Each player must have a unique position', 'error');
-          return;
-        }
-        positions.add(pos);
-        const score = this.players.length - pos + 1;
-        entries.push({ playerId: player.id!, value: score });
-      }
-    } else {
-      const firstOutId = (document.getElementById('first-out-select') as HTMLSelectElement)?.value ?? '';
-      for (const player of this.players) {
-        const input = document.getElementById(`score-input-${player.id}`) as HTMLInputElement;
-        const val = parseFloat(input?.value ?? '0') || 0;
-        const firstOut = firstOutId === String(player.id);
-        entries.push({ playerId: player.id!, value: val, ...(firstOut ? { note: 'first_out' } : {}) });
-      }
-    }
+    const { entries, error } = collectRoundEntries(mode, this.players, this.entries, this.totalPhases());
+    if (error) { showToast(error, mode === 'phase10' ? 'info' : 'error'); return; }
 
     const now = Date.now();
     try {
